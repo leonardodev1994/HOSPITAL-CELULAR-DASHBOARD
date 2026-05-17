@@ -1,0 +1,15 @@
+.venv/
+.venv-1/
+__pycache__/
+**/__pycache__/
+*.pyc
+__MACOSX/
+
+# Dados locais/sensíveis
+banco.db
+backups/
+uploads/
+tools/rclone
+
+# Sistema operacional
+.DS_Store

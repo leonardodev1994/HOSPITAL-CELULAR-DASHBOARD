@@ -1,0 +1,609 @@
+import json
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
+
+from utils.pdf_os import generate_os_pdf
+from views.clientes import create_cliente, load_clientes
+
+
+STATUS_OS = [
+    "Em análise",
+    "Em reparo",
+    "Aguardando peça",
+    "Finalizado",
+    "Entregue",
+    "Cancelado",
+]
+
+STATUS_COLORS = {
+    "Finalizado": ("#16A34A", "#052E16"),
+    "Entregue": ("#06B6D4", "#083344"),
+    "Cancelado": ("#DC2626", "#450A0A"),
+    "Aguardando peça": ("#EAB308", "#422006"),
+    "Em reparo": ("#6366F1", "#1E1B4B"),
+    "Em análise": ("#94A3B8", "#111827"),
+}
+
+TEST_OPTIONS = ["Ok", "Defeito", "Não Testado"]
+YES_NO = ["Sim", "Não"]
+FORMAS_PAGAMENTO = ["Dinheiro", "Pix", "Crédito", "Débito", "Misto"]
+
+CHECKLIST_ENTRADA = [
+    "Tela",
+    "Carregamento",
+    "Botões",
+    "Câmera traseira",
+    "Câmera frontal",
+    "Sensor de proximidade",
+    "Alto-falante",
+    "Auricular",
+    "Microfone",
+    "Carcaça",
+]
+
+CHECKLIST_SAIDA = [
+    "Power button",
+    "LCD",
+    "Home button",
+    "Touch ID ou Face ID",
+    "3D Touch",
+    "Botão de vibração",
+    "Botão de volume",
+    "Câmera frontal",
+    "Câmera traseira",
+    "Microfone",
+    "Alto-falante",
+    "Auricular",
+    "Sensor de proximidade",
+    "Porta do fone",
+    "Carcaça",
+]
+
+
+def _json_load(value):
+    if not value:
+        return {}
+
+    try:
+        data = json.loads(value)
+        return data if isinstance(data, dict) else {}
+    except (TypeError, json.JSONDecodeError):
+        return {}
+
+
+def _json_dump(value):
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _cliente_options(df_clientes):
+    options = {"Novo cliente": None}
+
+    for row in df_clientes.itertuples():
+        telefone = row.telefone or "sem telefone"
+        options[f"{row.nome} | {telefone}"] = row.id
+
+    return options
+
+
+def _cliente_selecionado(df_clientes, cliente_id):
+    if cliente_id is None:
+        return None
+
+    filtro = df_clientes[df_clientes["id"] == cliente_id]
+    return None if filtro.empty else filtro.iloc[0]
+
+
+def _load_ordens_servico(conn):
+    return pd.read_sql_query("""
+    SELECT
+        id,
+        data,
+        cliente,
+        telefone,
+        marca,
+        modelo,
+        servico,
+        valor,
+        garantia,
+        status
+    FROM ordens_servico
+    ORDER BY id DESC
+    """, conn)
+
+
+def _load_ordem_detalhe(conn, os_id):
+    df = pd.read_sql_query("""
+    SELECT *
+    FROM ordens_servico
+    WHERE id = ?
+    LIMIT 1
+    """, conn, params=(os_id,))
+
+    if df.empty:
+        return None
+
+    return df.iloc[0].to_dict()
+
+
+def _money(value):
+    try:
+        return f"R$ {float(value):.2f}"
+    except (TypeError, ValueError):
+        return "R$ 0.00"
+
+
+def _date_value(value):
+    try:
+        return pd.to_datetime(value).date()
+    except (TypeError, ValueError):
+        return datetime.today().date()
+
+
+def _status_badge(status):
+    color, bg = STATUS_COLORS.get(status, ("#94A3B8", "#111827"))
+    return (
+        f"<span class='status-badge' "
+        f"style='border-color:{color};background:{bg};color:{color};'>"
+        f"{status}</span>"
+    )
+
+
+def _pdf_button(os_id, os_data):
+    nome_arquivo = f"OS_{str(os_id).zfill(5)}_{os_data.get('cliente') or 'cliente'}.pdf"
+    nome_arquivo = nome_arquivo.replace(" ", "_").replace("/", "-").replace("\\", "-")
+    st.download_button(
+        "Baixar PDF",
+        data=generate_os_pdf(os_data),
+        file_name=nome_arquivo,
+        mime="application/pdf",
+        key=f"pdf_{os_id}",
+    )
+
+
+def _save_upload(uploaded_file, os_id, field):
+    if uploaded_file is None:
+        return None
+
+    upload_dir = Path("uploads") / "ordens_servico" / str(os_id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_name = uploaded_file.name.replace("/", "-").replace("\\", "-")
+    file_path = upload_dir / f"{field}_{safe_name}"
+    file_path.write_bytes(uploaded_file.getbuffer())
+    return str(file_path)
+
+
+def _existing_file_label(path):
+    if not path:
+        return
+
+    st.caption(f"Arquivo atual: {Path(path).name}")
+
+
+def _radio_value(label, options, current, key, horizontal=True):
+    if current not in options:
+        current = options[0]
+
+    return st.radio(
+        label,
+        options,
+        index=options.index(current),
+        key=key,
+        horizontal=horizontal,
+    )
+
+
+def _select_value(label, options, current, key):
+    if current not in options:
+        current = options[0]
+
+    return st.selectbox(label, options, index=options.index(current), key=key)
+
+
+def _render_checklist(prefix, items, current):
+    values = {}
+
+    for item in items:
+        field_key = item.lower().replace(" ", "_").replace("-", "_")
+        values[field_key] = _radio_value(
+            item,
+            TEST_OPTIONS,
+            current.get(field_key, "Não Testado"),
+            f"{prefix}_{field_key}",
+        )
+
+    return values
+
+
+def _render_upload(label, current, os_id, field_key, scope):
+    _existing_file_label(current.get(field_key))
+    uploaded = st.file_uploader(
+        label,
+        type=["png", "jpg", "jpeg", "webp", "pdf"],
+        key=f"upload_{os_id}_{scope}_{field_key}",
+    )
+    return _save_upload(uploaded, os_id, f"{scope}_{field_key}") or current.get(field_key, "")
+
+
+def _render_ordens_table(df_os):
+    if df_os.empty:
+        st.info("Nenhuma OS cadastrada.")
+        return
+
+    rows = []
+    for row in df_os.itertuples():
+        rows.append({
+            "OS": row.id,
+            "Cliente": row.cliente,
+            "Aparelho": f"{row.marca or ''} {row.modelo or ''}".strip(),
+            "Serviço": row.servico,
+            "Valor": row.valor,
+            "Status": row.status,
+        })
+
+    st.dataframe(
+        pd.DataFrame(rows),
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+        },
+    )
+
+
+def _create_ordem(conn, data):
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO ordens_servico (
+        data,
+        cliente_id,
+        atendente,
+        loja,
+        cliente,
+        cpf,
+        telefone,
+        endereco,
+        marca,
+        modelo,
+        imei,
+        senha,
+        defeito,
+        servico,
+        valor,
+        garantia,
+        status,
+        observacoes,
+        checklist_entrada,
+        checklist_reparo,
+        checklist_saida,
+        pagamento_os,
+        assinatura_entrada,
+        assinatura_saida
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, data)
+    conn.commit()
+    return cursor.lastrowid
+
+
+def _update_ordem(conn, os_id, data):
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE ordens_servico
+    SET
+        data = ?,
+        cliente = ?,
+        cpf = ?,
+        telefone = ?,
+        endereco = ?,
+        atendente = ?,
+        loja = ?,
+        marca = ?,
+        modelo = ?,
+        imei = ?,
+        senha = ?,
+        defeito = ?,
+        servico = ?,
+        valor = ?,
+        garantia = ?,
+        status = ?,
+        observacoes = ?,
+        checklist_entrada = ?,
+        checklist_reparo = ?,
+        checklist_saida = ?,
+        pagamento_os = ?,
+        assinatura_entrada = ?,
+        assinatura_saida = ?
+    WHERE id = ?
+    """, (*data, os_id))
+    conn.commit()
+
+
+def _render_nova_os(conn):
+    cursor = conn.cursor()
+    df_clientes = load_clientes(conn, somente_ativos=True)
+
+    with st.expander("➕ Nova Ordem de Serviço", expanded=False):
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            data_os = st.date_input("Data", datetime.today(), key="nova_os_data")
+        with col2:
+            atendente = st.text_input("Atendente", key="nova_os_atendente")
+        with col3:
+            loja = st.text_input("Loja", key="nova_os_loja")
+
+        st.markdown("#### Cliente")
+        options = _cliente_options(df_clientes)
+        cliente_label = st.selectbox("Cliente cadastrado", list(options.keys()), key="nova_os_cliente_select")
+        cliente_id = options[cliente_label]
+        cliente_atual = _cliente_selecionado(df_clientes, cliente_id)
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            cliente = st.text_input("Nome do Cliente", value="" if cliente_atual is None else cliente_atual["nome"], key=f"nova_nome_{cliente_id or 'novo'}")
+        with col2:
+            cpf = st.text_input("CPF", value="" if cliente_atual is None else cliente_atual["cpf"] or "", key=f"nova_cpf_{cliente_id or 'novo'}")
+        with col3:
+            telefone = st.text_input("Telefone", value="" if cliente_atual is None else cliente_atual["telefone"] or "", key=f"nova_tel_{cliente_id or 'novo'}")
+
+        endereco = st.text_area("Endereço", value="" if cliente_atual is None else cliente_atual["endereco"] or "", key=f"nova_end_{cliente_id or 'novo'}")
+        salvar_cliente = cliente_id is None and st.checkbox("Salvar este cliente no cadastro", value=True)
+
+        st.markdown("#### Aparelho e serviço")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            marca = st.text_input("Marca")
+            valor = st.number_input("Valor", min_value=0.0)
+        with col2:
+            modelo = st.text_input("Modelo")
+            garantia = st.selectbox("Garantia", ["30 dias", "60 dias", "90 dias"])
+        with col3:
+            imei = st.text_input("IMEI")
+            status = st.selectbox("Status", STATUS_OS)
+
+        senha = st.text_input("Senha")
+        defeito = st.text_area("Defeito Relatado")
+        servico = st.text_area("Serviço Realizado")
+        observacoes = st.text_area("Observações")
+
+        if st.button("Salvar Ordem de Serviço", width="stretch"):
+            if not cliente.strip():
+                st.error("Informe o nome do cliente para salvar a OS.")
+                return
+
+            if cliente_id is None and salvar_cliente:
+                cliente_id = create_cliente(conn, cliente, cpf, telefone, endereco)
+
+            os_id = _create_ordem(conn, (
+                str(data_os),
+                cliente_id,
+                atendente,
+                loja,
+                cliente,
+                cpf,
+                telefone,
+                endereco,
+                marca,
+                modelo,
+                imei,
+                senha,
+                defeito,
+                servico,
+                valor,
+                garantia,
+                status,
+                observacoes,
+                _json_dump({}),
+                _json_dump({}),
+                _json_dump({}),
+                _json_dump({}),
+                "",
+                "",
+            ))
+            st.success(f"✅ OS #{str(os_id).zfill(5)} salva!")
+            st.rerun()
+
+
+def _render_edit_form(conn, os_id):
+    os_data = _load_ordem_detalhe(conn, os_id)
+
+    if not os_data:
+        st.warning("OS não encontrada.")
+        return
+
+    entrada = _json_load(os_data.get("checklist_entrada"))
+    reparo = _json_load(os_data.get("checklist_reparo"))
+    saida = _json_load(os_data.get("checklist_saida"))
+    pagamento = _json_load(os_data.get("pagamento_os"))
+
+    tab_dados, tab_entrada, tab_reparo, tab_saida, tab_pagamento = st.tabs([
+        "Dados",
+        "Entrada",
+        "Reparo",
+        "Saída",
+        "Pagamento",
+    ])
+
+    with tab_dados:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            data_os = st.date_input("Data", _date_value(os_data.get("data")), key=f"edit_data_{os_id}")
+            cliente = st.text_input("Cliente", value=os_data.get("cliente") or "", key=f"edit_cliente_{os_id}")
+            telefone = st.text_input("Telefone", value=os_data.get("telefone") or "", key=f"edit_telefone_{os_id}")
+        with col2:
+            atendente = st.text_input("Atendente", value=os_data.get("atendente") or "", key=f"edit_atendente_{os_id}")
+            cpf = st.text_input("CPF", value=os_data.get("cpf") or "", key=f"edit_cpf_{os_id}")
+            loja = st.text_input("Loja", value=os_data.get("loja") or "", key=f"edit_loja_{os_id}")
+        with col3:
+            status = _select_value("Status", STATUS_OS, os_data.get("status") or "Em análise", f"edit_status_{os_id}")
+            garantia = st.selectbox(
+                "Garantia",
+                ["30 dias", "60 dias", "90 dias"],
+                index=["30 dias", "60 dias", "90 dias"].index(os_data.get("garantia"))
+                if os_data.get("garantia") in ["30 dias", "60 dias", "90 dias"]
+                else 0,
+                key=f"edit_garantia_{os_id}",
+            )
+            valor = st.number_input("Valor", min_value=0.0, value=float(os_data.get("valor") or 0), key=f"edit_valor_{os_id}")
+
+        endereco = st.text_area("Endereço", value=os_data.get("endereco") or "", key=f"edit_endereco_{os_id}")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            marca = st.text_input("Marca", value=os_data.get("marca") or "", key=f"edit_marca_{os_id}")
+        with col2:
+            modelo = st.text_input("Modelo", value=os_data.get("modelo") or "", key=f"edit_modelo_{os_id}")
+        with col3:
+            imei = st.text_input("IMEI", value=os_data.get("imei") or "", key=f"edit_imei_{os_id}")
+
+        senha = st.text_input("Senha", value=os_data.get("senha") or "", key=f"edit_senha_{os_id}")
+        defeito = st.text_area("Defeito Relatado", value=os_data.get("defeito") or "", key=f"edit_defeito_{os_id}")
+        servico = st.text_area("Serviço Realizado", value=os_data.get("servico") or "", key=f"edit_servico_{os_id}")
+        observacoes = st.text_area("Observações gerais", value=os_data.get("observacoes") or "", key=f"edit_obs_{os_id}")
+
+    with tab_entrada:
+        st.markdown("#### Testes de entrada")
+        entrada["possui_backup"] = _radio_value("Possui backup?", YES_NO, entrada.get("possui_backup", "Não"), f"entrada_backup_{os_id}")
+        entrada["ja_reparou"] = _radio_value("Já fez algum reparo neste aparelho?", ["Sim", "Não", "Não sabe"], entrada.get("ja_reparou", "Não sabe"), f"entrada_reparo_anterior_{os_id}")
+        entrada["tests"] = _render_checklist(f"entrada_tests_{os_id}", CHECKLIST_ENTRADA, entrada.get("tests", {}))
+        entrada["foto_frente"] = _render_upload("Foto frontal de entrada", entrada, os_id, "foto_frente", "entrada")
+        entrada["foto_tras"] = _render_upload("Foto traseira de entrada", entrada, os_id, "foto_tras", "entrada")
+        entrada["foto_extra"] = _render_upload("Foto extra de entrada", entrada, os_id, "foto_extra", "entrada")
+        entrada["observacoes"] = st.text_area("Observações sobre entrada", value=entrada.get("observacoes", ""), key=f"entrada_obs_{os_id}")
+        assinatura_entrada = st.text_input(
+            "Assinatura de entrada do cliente",
+            value=os_data.get("assinatura_entrada") or "",
+            key=f"assinatura_entrada_{os_id}",
+            help="Por enquanto registre o nome/confirmo. No app futuro entraremos com assinatura no touch.",
+        )
+
+    with tab_reparo:
+        st.markdown("#### Abertura e reparo")
+        reparo["tecnico"] = st.text_input("Técnico do reparo", value=reparo.get("tecnico", ""), key=f"reparo_tecnico_{os_id}")
+        reparo["aparelho_molhou"] = _radio_value("Aparelho já molhou?", YES_NO, reparo.get("aparelho_molhou", "Não"), f"reparo_molhou_{os_id}")
+        reparo["falta_componentes"] = _radio_value("Possui falta de componentes internos?", YES_NO, reparo.get("falta_componentes", "Não"), f"reparo_componentes_{os_id}")
+        reparo["foto_interna"] = _render_upload("Foto interna do aparelho", reparo, os_id, "foto_interna", "reparo")
+        reparo["foto_interna_extra"] = _render_upload("Foto interna extra", reparo, os_id, "foto_interna_extra", "reparo")
+        reparo["servico_realizado"] = st.text_area("Serviço realizado no reparo", value=reparo.get("servico_realizado", ""), key=f"reparo_servico_{os_id}")
+        reparo["fornecedor"] = st.text_input("Fornecedor", value=reparo.get("fornecedor", ""), key=f"reparo_fornecedor_{os_id}")
+        reparo["foto_peca"] = _render_upload("Foto da peça", reparo, os_id, "foto_peca", "reparo")
+        reparo["observacoes"] = st.text_area("Observações do reparo", value=reparo.get("observacoes", ""), key=f"reparo_obs_{os_id}")
+
+    with tab_saida:
+        st.markdown("#### Testes de saída")
+        saida["tests"] = _render_checklist(f"saida_tests_{os_id}", CHECKLIST_SAIDA, saida.get("tests", {}))
+        saida["foto_frente"] = _render_upload("Foto frontal de saída", saida, os_id, "foto_frente", "saida")
+        saida["foto_tras"] = _render_upload("Foto traseira de saída", saida, os_id, "foto_tras", "saida")
+        saida["foto_extra"] = _render_upload("Foto extra de saída", saida, os_id, "foto_extra", "saida")
+        saida["observacoes"] = st.text_area("Observações de saída", value=saida.get("observacoes", ""), key=f"saida_obs_{os_id}")
+        saida["cliente_levou_tela"] = _radio_value("Cliente levou a tela?", YES_NO, saida.get("cliente_levou_tela", "Não"), f"saida_tela_{os_id}")
+        assinatura_saida = st.text_input(
+            "Assinatura de saída do cliente",
+            value=os_data.get("assinatura_saida") or "",
+            key=f"assinatura_saida_{os_id}",
+            help="Por enquanto registre o nome/confirmo. No app futuro entraremos com assinatura no touch.",
+        )
+
+    with tab_pagamento:
+        st.markdown("#### Pagamento da OS")
+        pagamento["valor"] = st.number_input(
+            "Valor pago",
+            min_value=0.0,
+            value=float(pagamento.get("valor") or os_data.get("valor") or 0),
+            key=f"pagamento_valor_{os_id}",
+        )
+        pagamento["forma"] = _select_value("Forma de pagamento", FORMAS_PAGAMENTO, pagamento.get("forma", "Dinheiro"), f"pagamento_forma_{os_id}")
+        pagamento["numero_nf"] = st.text_input("Número da NF", value=pagamento.get("numero_nf", ""), key=f"pagamento_nf_{os_id}")
+        pagamento["observacoes"] = st.text_area("Observações do pagamento", value=pagamento.get("observacoes", ""), key=f"pagamento_obs_{os_id}")
+
+        if pagamento["forma"] in ["Pix", "Crédito", "Débito", "Misto"]:
+            st.caption("Comprovante recomendado para Pix ou cartão.")
+            pagamento["foto_comprovante"] = _render_upload("Foto do comprovante", pagamento, os_id, "foto_comprovante", "pagamento")
+
+    if st.button("Salvar edição da OS", key=f"salvar_edicao_{os_id}", width="stretch"):
+        if not cliente.strip():
+            st.error("Informe o nome do cliente.")
+            return
+
+        _update_ordem(conn, os_id, (
+            str(data_os),
+            cliente,
+            cpf,
+            telefone,
+            endereco,
+            atendente,
+            loja,
+            marca,
+            modelo,
+            imei,
+            senha,
+            defeito,
+            servico,
+            valor,
+            garantia,
+            status,
+            observacoes,
+            _json_dump(entrada),
+            _json_dump(reparo),
+            _json_dump(saida),
+            _json_dump(pagamento),
+            assinatura_entrada,
+            assinatura_saida,
+        ))
+        st.success("✅ OS atualizada!")
+        st.rerun()
+
+
+def _render_lista_ordens(conn):
+    df_os = _load_ordens_servico(conn)
+
+    st.subheader("📋 Ordens cadastradas")
+    _render_ordens_table(df_os)
+
+    if df_os.empty:
+        return
+
+    st.divider()
+    st.markdown("#### Editar ou imprimir")
+
+    for row in df_os.itertuples():
+        os_data = _load_ordem_detalhe(conn, row.id)
+        title = f"OS #{str(row.id).zfill(5)} - {row.cliente or 'Sem cliente'} - {row.marca or ''} {row.modelo or ''}"
+
+        with st.expander(title, expanded=False):
+            color, _ = STATUS_COLORS.get(row.status, ("#94A3B8", "#111827"))
+            st.markdown(
+                f"""
+                <div class="os-card" style="border-left-color:{color};">
+                    <div>
+                        <strong>{row.cliente or 'Sem cliente'}</strong><br>
+                        <span>{row.telefone or ''}</span><br>
+                        <span>{row.servico or ''}</span>
+                    </div>
+                    <div>{_status_badge(row.status)}</div>
+                    <div><strong>{_money(row.valor)}</strong></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                _pdf_button(row.id, os_data)
+            with col2:
+                st.caption("Use as abas abaixo para corrigir dados, atualizar status, anexar fotos e completar o checklist.")
+
+            _render_edit_form(conn, row.id)
+
+
+def render_ordem_servico(conn):
+    st.subheader("📋 Ordem de Serviço")
+    st.caption("Cadastre, edite, acompanhe por status e imprima a OS no mesmo lugar.")
+
+    _render_nova_os(conn)
+    st.divider()
+    _render_lista_ordens(conn)
