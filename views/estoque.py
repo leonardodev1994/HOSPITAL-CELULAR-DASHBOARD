@@ -6,6 +6,7 @@ import streamlit as st
 from utils.dashboard_ui import metric_card, moeda, page_header
 from utils.estoque import (
     PLANILHA_PADRAO,
+    add_stock_product,
     adjust_stock,
     import_inventory_from_excel,
     load_stock,
@@ -54,6 +55,47 @@ def render_estoque(conn):
         metric_card("Valor estimado", moeda(valor_estimado), "Preço de venda", "#F59E0B")
 
     st.divider()
+
+    with st.expander("➕ Cadastrar novo produto", expanded=False):
+        with st.form("novo_produto_estoque_form"):
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                produto = st.text_input("Produto")
+                modelo = st.text_input("Modelo", placeholder="Opcional")
+
+            with col2:
+                categoria = st.text_input("Categoria", placeholder="Ex.: Carregadores, Películas")
+                quantidade = st.number_input("Quantidade inicial", min_value=0.0, value=1.0, step=1.0)
+
+            with col3:
+                valor_venda = st.number_input("Valor de venda", min_value=0.0, value=0.0, step=1.0)
+                estoque_minimo = st.number_input("Estoque mínimo", min_value=0.0, value=1.0, step=1.0)
+
+            observacao = st.text_area("Observação")
+            submitted = st.form_submit_button("Salvar produto")
+
+        if submitted:
+            try:
+                _, updated = add_stock_product(
+                    conn,
+                    produto,
+                    modelo,
+                    categoria,
+                    quantidade,
+                    valor_venda,
+                    estoque_minimo,
+                    observacao,
+                )
+                if updated:
+                    st.success("✅ Produto já existia. A quantidade foi somada ao estoque.")
+                else:
+                    st.success("✅ Produto cadastrado no estoque.")
+                st.rerun()
+            except ValueError as error:
+                st.error(str(error))
+            except Exception as error:
+                st.error(f"Erro ao salvar produto: {error}")
 
     with st.expander("Importar planilha de estoque", expanded=df.empty):
         st.caption("Películas serão consolidadas automaticamente como Película 3D.")

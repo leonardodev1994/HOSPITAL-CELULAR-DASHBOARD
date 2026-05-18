@@ -2,6 +2,8 @@ from datetime import datetime
 
 import pandas as pd
 
+from database.database import execute_insert_returning_id
+
 
 PLANILHA_PADRAO = "/Users/macdeleonardo/Downloads/Controle_Estoque_Peixinho_2.xlsx"
 
@@ -133,6 +135,90 @@ def import_inventory_from_excel(conn, path=PLANILHA_PADRAO):
 
     conn.commit()
     return imported, updated, len(df)
+
+
+def add_stock_product(
+    conn,
+    produto,
+    modelo="",
+    categoria="",
+    quantidade=0,
+    valor_venda=0,
+    estoque_minimo=0,
+    observacao="",
+):
+    produto = normalize_text(produto)
+    modelo = normalize_text(modelo)
+    categoria = normalize_text(categoria)
+    observacao = normalize_text(observacao)
+    quantidade = float(quantidade or 0)
+    valor_venda = float(valor_venda or 0)
+    estoque_minimo = float(estoque_minimo or 0)
+
+    if not produto:
+        raise ValueError("Informe o nome do produto.")
+
+    cursor = conn.cursor()
+    existing = cursor.execute("""
+    SELECT id, quantidade
+    FROM estoque
+    WHERE produto = ? AND COALESCE(modelo, '') = COALESCE(?, '')
+    """, (produto, modelo)).fetchone()
+
+    if existing:
+        produto_id = existing[0]
+        nova_quantidade = float(existing[1] or 0) + quantidade
+        cursor.execute("""
+        UPDATE estoque
+        SET categoria = ?,
+            quantidade = ?,
+            valor_venda = ?,
+            estoque_minimo = ?,
+            observacao = ?,
+            ativo = 1,
+            atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """, (
+            categoria,
+            nova_quantidade,
+            valor_venda,
+            estoque_minimo,
+            observacao,
+            produto_id,
+        ))
+        conn.commit()
+    else:
+        produto_id = execute_insert_returning_id(conn, cursor, """
+        INSERT INTO estoque (
+            produto,
+            modelo,
+            categoria,
+            quantidade,
+            valor_venda,
+            estoque_minimo,
+            observacao
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            produto,
+            modelo,
+            categoria,
+            quantidade,
+            valor_venda,
+            estoque_minimo,
+            observacao,
+        ))
+
+    if quantidade > 0:
+        register_stock_movement(
+            conn,
+            produto_id,
+            "Entrada",
+            quantidade,
+            "Cadastro de produto",
+        )
+
+    return produto_id, bool(existing)
 
 
 def load_stock(conn, only_active=True):
