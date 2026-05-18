@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from database.database import execute_insert_returning_id
 from utils.pdf_os import generate_os_pdf
 from views.clientes import create_cliente, load_clientes
 
@@ -256,7 +257,7 @@ def _render_ordens_table(df_os):
 
 def _create_ordem(conn, data):
     cursor = conn.cursor()
-    cursor.execute("""
+    return execute_insert_returning_id(conn, cursor, """
     INSERT INTO ordens_servico (
         data,
         cliente_id,
@@ -285,8 +286,6 @@ def _create_ordem(conn, data):
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, data)
-    conn.commit()
-    return cursor.lastrowid
 
 
 def _update_ordem(conn, os_id, data):

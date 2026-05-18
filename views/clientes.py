@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+from database.database import execute_insert_returning_id
+
 
 def load_clientes(conn, somente_ativos=False):
     query = """
@@ -27,7 +29,7 @@ def load_clientes(conn, somente_ativos=False):
 
 def create_cliente(conn, nome, cpf, telefone, endereco, email="", observacoes="", ativo=True):
     cursor = conn.cursor()
-    cursor.execute("""
+    return execute_insert_returning_id(conn, cursor, """
     INSERT INTO clientes (
         nome,
         cpf,
@@ -47,8 +49,6 @@ def create_cliente(conn, nome, cpf, telefone, endereco, email="", observacoes=""
         observacoes.strip(),
         1 if ativo else 0,
     ))
-    conn.commit()
-    return cursor.lastrowid
 
 
 def update_cliente(conn, cliente_id, nome, cpf, telefone, endereco, email, observacoes, ativo):

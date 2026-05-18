@@ -6,7 +6,8 @@ O sistema está pronto para rodar como app Streamlit com:
 
 - `app.py` como arquivo principal;
 - `requirements.txt` com dependências;
-- banco SQLite em `banco.db`;
+- banco SQLite local em `banco.db`;
+- suporte a PostgreSQL/Supabase quando `DATABASE_URL` estiver configurado;
 - backups locais na pasta `backups/`.
 
 ## Recomendação
@@ -14,6 +15,38 @@ O sistema está pronto para rodar como app Streamlit com:
 Para uso interno rápido, hospedar em uma VPS simples é o caminho mais seguro, porque o SQLite e os backups locais continuam funcionando.
 
 Para Streamlit Community Cloud, Render ou Railway, o app sobe mais facilmente, mas o banco SQLite pode não ser persistente dependendo do plano/ambiente. Para produção online de verdade, o ideal é migrar o banco para PostgreSQL/Supabase.
+
+## Streamlit Cloud + Supabase
+
+No Supabase, crie um projeto e copie a connection string PostgreSQL em:
+
+```text
+Project Settings > Database > Connection string
+```
+
+No Streamlit Cloud, abra:
+
+```text
+App > Settings > Secrets
+```
+
+E adicione:
+
+```toml
+DATABASE_URL = "postgresql://postgres.SEUPROJETO:SUA_SENHA@aws-0-sa-east-1.pooler.supabase.com:6543/postgres"
+```
+
+Depois de salvar o Secret, reinicie o app no Streamlit Cloud.
+
+## Migrar dados do banco local para Supabase
+
+Com a URL do Supabase em mãos, rode no seu computador:
+
+```bash
+./.venv/bin/python scripts/migrate_sqlite_to_supabase.py --database-url "SUA_DATABASE_URL_DO_SUPABASE" --replace
+```
+
+O `--replace` apaga os dados atuais no Supabase antes de enviar os dados do `banco.db` local. Use sem `--replace` se quiser apenas atualizar/inserir pelos IDs.
 
 ## Comando de execução
 

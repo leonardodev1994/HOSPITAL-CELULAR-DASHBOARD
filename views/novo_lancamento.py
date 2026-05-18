@@ -2,6 +2,7 @@ from datetime import datetime
 
 import streamlit as st
 
+from database.database import execute_insert_returning_id
 from utils.estoque import load_stock, produto_label, reduce_stock
 
 
@@ -76,13 +77,10 @@ def render_novo_lancamento(conn):
             st.error("Informe pelo menos uma forma de pagamento com valor maior que zero.")
             return
 
-        cursor.execute("""
+        lancamento_id = execute_insert_returning_id(conn, cursor, """
         INSERT INTO lancamentos (data, tipo, descricao, valor, produto_id, quantidade)
         VALUES (?, ?, ?, ?, ?, ?)
         """, (str(data), tipo, descricao, valor_total, produto_id, quantidade if tipo == "Produto" else None))
-
-        conn.commit()
-        lancamento_id = cursor.lastrowid
 
         if tipo == "Produto":
             try:
