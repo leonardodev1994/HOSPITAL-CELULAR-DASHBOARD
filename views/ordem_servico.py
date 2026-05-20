@@ -213,7 +213,7 @@ def _render_file_preview(label, path):
             "Baixar arquivo",
             data=file_path.read_bytes(),
             file_name=file_path.name,
-            key=f"download_{label}_{file_path}",
+            key=f"download_{abs(hash(str(file_path)))}",
         )
 
 
@@ -253,14 +253,47 @@ def _render_checklist(prefix, items, current):
 
 
 def _render_upload(label, current, os_id, field_key, scope):
-    _existing_file_label(current.get(field_key))
-    _render_file_preview(label, current.get(field_key))
+    current_path = current.get(field_key)
+    edit_key = f"edit_file_{os_id}_{scope}_{field_key}"
+    delete_key = f"delete_file_{os_id}_{scope}_{field_key}"
+
+    if not current_path:
+        st.session_state.pop(delete_key, None)
+
+    if current_path and not st.session_state.get(delete_key):
+        _existing_file_label(current_path)
+        _render_file_preview(label, current_path)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Trocar arquivo", key=f"trocar_{os_id}_{scope}_{field_key}"):
+                st.session_state[edit_key] = True
+                st.rerun()
+        with col2:
+            if st.button("Apagar arquivo", key=f"apagar_{os_id}_{scope}_{field_key}"):
+                st.session_state[delete_key] = True
+                st.session_state[edit_key] = False
+                st.rerun()
+
+    if st.session_state.get(delete_key):
+        st.warning("Arquivo marcado para apagar. Clique em Salvar edição da OS para confirmar.")
+        return ""
+
+    if current_path and not st.session_state.get(edit_key):
+        return current_path
+
     uploaded = st.file_uploader(
         label,
         type=["png", "jpg", "jpeg", "webp", "pdf"],
         key=f"upload_{os_id}_{scope}_{field_key}",
     )
-    return _save_upload(uploaded, os_id, f"{scope}_{field_key}") or current.get(field_key, "")
+    saved = _save_upload(uploaded, os_id, f"{scope}_{field_key}")
+    if saved:
+        st.session_state[edit_key] = False
+        st.session_state[delete_key] = False
+        return saved
+
+    return current_path or ""
 
 
 def _signature_has_trace(image_data):
@@ -290,11 +323,39 @@ def _save_signature(canvas_result, os_id, field, current_value):
 
 
 def _render_signature(label, current_value, os_id, field):
-    if current_value:
+    edit_key = f"edit_signature_{os_id}_{field}"
+    delete_key = f"delete_signature_{os_id}_{field}"
+
+    if not current_value:
+        st.session_state.pop(delete_key, None)
+
+    if current_value and not st.session_state.get(delete_key):
         if _is_existing_file(current_value) and _is_image_file(current_value):
             st.image(str(current_value), caption=f"{label} atual", width=320)
         else:
             st.caption(f"Assinatura atual: {current_value}")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Editar assinatura", key=f"editar_{os_id}_{field}"):
+                st.session_state[edit_key] = True
+                st.rerun()
+        with col2:
+            if st.button("Apagar assinatura", key=f"apagar_{os_id}_{field}"):
+                st.session_state[delete_key] = True
+                st.session_state[edit_key] = False
+                st.rerun()
+    elif not st.session_state.get(edit_key):
+        if st.button("Criar assinatura", key=f"criar_{os_id}_{field}"):
+            st.session_state[edit_key] = True
+            st.rerun()
+
+    if st.session_state.get(delete_key):
+        st.warning("Assinatura marcada para apagar. Clique em Salvar edição da OS para confirmar.")
+        return None
+
+    if not st.session_state.get(edit_key):
+        return None
 
     st.caption("Assine no quadro abaixo usando touch, mouse ou caneta.")
     return st_canvas(
@@ -307,6 +368,23 @@ def _render_signature(label, current_value, os_id, field):
         drawing_mode="freedraw",
         key=f"canvas_{os_id}_{field}",
     )
+
+
+def _signature_value_after_save(canvas_result, os_id, field, current_value):
+    edit_key = f"edit_signature_{os_id}_{field}"
+    delete_key = f"delete_signature_{os_id}_{field}"
+
+    if st.session_state.get(delete_key):
+        st.session_state.pop(delete_key, None)
+        st.session_state.pop(edit_key, None)
+        return ""
+
+    if st.session_state.get(edit_key):
+        value = _save_signature(canvas_result, os_id, field, current_value)
+        st.session_state.pop(edit_key, None)
+        return value
+
+    return current_value or ""
 
 
 def _render_ordens_table(df_os):
@@ -612,13 +690,13 @@ def _render_edit_form(conn, os_id):
             st.error("Informe o nome do cliente.")
             return
 
-        assinatura_entrada = _save_signature(
+        assinatura_entrada = _signature_value_after_save(
             assinatura_entrada_canvas,
             os_id,
             "assinatura_entrada",
             assinatura_entrada_atual,
         )
-        assinatura_saida = _save_signature(
+        assinatura_saida = _signature_value_after_save(
             assinatura_saida_canvas,
             os_id,
             "assinatura_saida",
