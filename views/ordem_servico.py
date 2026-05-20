@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from PIL import Image
+from streamlit_drawable_canvas import st_canvas
 
 from database.database import execute_insert_returning_id
 from utils.pdf_os import generate_os_pdf
@@ -184,6 +186,37 @@ def _existing_file_label(path):
     st.caption(f"Arquivo atual: {Path(path).name}")
 
 
+def _is_existing_file(path):
+    return bool(path) and Path(str(path)).exists()
+
+
+def _is_image_file(path):
+    return Path(str(path)).suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]
+
+
+def _render_file_preview(label, path):
+    if not path:
+        return
+
+    if not _is_existing_file(path):
+        st.caption(f"{label}: {path}")
+        return
+
+    file_path = Path(path)
+    with st.expander(f"Visualizar {label}", expanded=False):
+        if _is_image_file(file_path):
+            st.image(str(file_path), caption=file_path.name, width=320)
+        else:
+            st.caption(file_path.name)
+
+        st.download_button(
+            "Baixar arquivo",
+            data=file_path.read_bytes(),
+            file_name=file_path.name,
+            key=f"download_{label}_{file_path}",
+        )
+
+
 def _radio_value(label, options, current, key, horizontal=True):
     if current not in options:
         current = options[0]
@@ -221,12 +254,59 @@ def _render_checklist(prefix, items, current):
 
 def _render_upload(label, current, os_id, field_key, scope):
     _existing_file_label(current.get(field_key))
+    _render_file_preview(label, current.get(field_key))
     uploaded = st.file_uploader(
         label,
         type=["png", "jpg", "jpeg", "webp", "pdf"],
         key=f"upload_{os_id}_{scope}_{field_key}",
     )
     return _save_upload(uploaded, os_id, f"{scope}_{field_key}") or current.get(field_key, "")
+
+
+def _signature_has_trace(image_data):
+    if image_data is None:
+        return False
+
+    rgb = image_data[:, :, :3]
+    alpha = image_data[:, :, 3]
+    drawn_pixels = ((rgb < 245).any(axis=2)) & (alpha > 0)
+    return bool(drawn_pixels.sum() > 30)
+
+
+def _save_signature(canvas_result, os_id, field, current_value):
+    if canvas_result is None or canvas_result.image_data is None:
+        return current_value or ""
+
+    if not _signature_has_trace(canvas_result.image_data):
+        return current_value or ""
+
+    upload_dir = Path("uploads") / "ordens_servico" / str(os_id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = upload_dir / f"{field}.png"
+    image = Image.fromarray(canvas_result.image_data.astype("uint8"), "RGBA")
+    image.save(file_path)
+    return str(file_path)
+
+
+def _render_signature(label, current_value, os_id, field):
+    if current_value:
+        if _is_existing_file(current_value) and _is_image_file(current_value):
+            st.image(str(current_value), caption=f"{label} atual", width=320)
+        else:
+            st.caption(f"Assinatura atual: {current_value}")
+
+    st.caption("Assine no quadro abaixo usando touch, mouse ou caneta.")
+    return st_canvas(
+        fill_color="rgba(255, 255, 255, 0)",
+        stroke_width=3,
+        stroke_color="#111827",
+        background_color="#FFFFFF",
+        height=180,
+        width=520,
+        drawing_mode="freedraw",
+        key=f"canvas_{os_id}_{field}",
+    )
 
 
 def _render_ordens_table(df_os):
@@ -418,6 +498,8 @@ def _render_edit_form(conn, os_id):
     reparo = _json_load(os_data.get("checklist_reparo"))
     saida = _json_load(os_data.get("checklist_saida"))
     pagamento = _json_load(os_data.get("pagamento_os"))
+    assinatura_entrada_atual = os_data.get("assinatura_entrada") or ""
+    assinatura_saida_atual = os_data.get("assinatura_saida") or ""
 
     tab_dados, tab_entrada, tab_reparo, tab_saida, tab_pagamento = st.tabs([
         "Dados",
@@ -473,11 +555,12 @@ def _render_edit_form(conn, os_id):
         entrada["foto_tras"] = _render_upload("Foto traseira de entrada", entrada, os_id, "foto_tras", "entrada")
         entrada["foto_extra"] = _render_upload("Foto extra de entrada", entrada, os_id, "foto_extra", "entrada")
         entrada["observacoes"] = st.text_area("Observações sobre entrada", value=entrada.get("observacoes", ""), key=f"entrada_obs_{os_id}")
-        assinatura_entrada = st.text_input(
-            "Assinatura de entrada do cliente",
-            value=os_data.get("assinatura_entrada") or "",
-            key=f"assinatura_entrada_{os_id}",
-            help="Por enquanto registre o nome/confirmo. No app futuro entraremos com assinatura no touch.",
+        st.markdown("#### Assinatura de entrada")
+        assinatura_entrada_canvas = _render_signature(
+            "Assinatura de entrada",
+            assinatura_entrada_atual,
+            os_id,
+            "assinatura_entrada",
         )
 
     with tab_reparo:
@@ -500,11 +583,12 @@ def _render_edit_form(conn, os_id):
         saida["foto_extra"] = _render_upload("Foto extra de saída", saida, os_id, "foto_extra", "saida")
         saida["observacoes"] = st.text_area("Observações de saída", value=saida.get("observacoes", ""), key=f"saida_obs_{os_id}")
         saida["cliente_levou_tela"] = _radio_value("Cliente levou a tela?", YES_NO, saida.get("cliente_levou_tela", "Não"), f"saida_tela_{os_id}")
-        assinatura_saida = st.text_input(
-            "Assinatura de saída do cliente",
-            value=os_data.get("assinatura_saida") or "",
-            key=f"assinatura_saida_{os_id}",
-            help="Por enquanto registre o nome/confirmo. No app futuro entraremos com assinatura no touch.",
+        st.markdown("#### Assinatura de saída")
+        assinatura_saida_canvas = _render_signature(
+            "Assinatura de saída",
+            assinatura_saida_atual,
+            os_id,
+            "assinatura_saida",
         )
 
     with tab_pagamento:
@@ -527,6 +611,19 @@ def _render_edit_form(conn, os_id):
         if not cliente.strip():
             st.error("Informe o nome do cliente.")
             return
+
+        assinatura_entrada = _save_signature(
+            assinatura_entrada_canvas,
+            os_id,
+            "assinatura_entrada",
+            assinatura_entrada_atual,
+        )
+        assinatura_saida = _save_signature(
+            assinatura_saida_canvas,
+            os_id,
+            "assinatura_saida",
+            assinatura_saida_atual,
+        )
 
         _update_ordem(conn, os_id, (
             str(data_os),

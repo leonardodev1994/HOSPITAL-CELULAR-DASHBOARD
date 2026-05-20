@@ -146,17 +146,32 @@ def _info_table(rows, widths):
     )
 
 
-def _signature_table(styles):
+def _signature_image(path):
+    if not path:
+        return ""
+
+    image_path = Path(str(path))
+    if not image_path.exists() or image_path.suffix.lower() not in [".png", ".jpg", ".jpeg", ".webp"]:
+        return ""
+
+    image = Image(str(image_path), width=76 * mm, height=18 * mm)
+    image.hAlign = "CENTER"
+    return image
+
+
+def _signature_table(styles, assinatura_cliente=None):
+    assinatura = _signature_image(assinatura_cliente)
     return Table(
         [
-            ["", ""],
+            [assinatura, ""],
             [_p("Assinatura do cliente", styles["Muted"]), _p("Responsável pela loja", styles["Muted"])],
         ],
         colWidths=[84 * mm, 84 * mm],
-        rowHeights=[16 * mm, 8 * mm],
+        rowHeights=[20 * mm, 8 * mm],
         style=TableStyle([
             ("LINEBELOW", (0, 0), (0, 0), 0.8, DARK),
             ("LINEBELOW", (1, 0), (1, 0), 0.8, DARK),
+            ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
             ("LEFTPADDING", (0, 0), (-1, -1), 0),
             ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ("TOPPADDING", (0, 0), (-1, -1), 2),
@@ -251,7 +266,7 @@ def generate_os_pdf(os_data):
 
     story.extend([
         Spacer(1, 18 * mm),
-        _signature_table(styles),
+        _signature_table(styles, os_data.get("assinatura_saida") or os_data.get("assinatura_entrada")),
         Spacer(1, 5 * mm),
         _p("Documento gerado pelo sistema Hospital do Celular.", styles["Muted"]),
     ])

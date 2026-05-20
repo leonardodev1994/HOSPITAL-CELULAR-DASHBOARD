@@ -60,7 +60,7 @@ def reset_sequence(pg_conn, table):
     SELECT setval(
         pg_get_serial_sequence('{table}', 'id'),
         COALESCE((SELECT MAX(id) FROM {table}), 1),
-        true
+        (SELECT COUNT(*) FROM {table}) > 0
     )
     """)
     pg_conn.commit()

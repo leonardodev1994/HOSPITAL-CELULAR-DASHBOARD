@@ -4,3 +4,4 @@ plotly
 reportlab
 openpyxl
 psycopg2-binary
+streamlit-drawable-canvas

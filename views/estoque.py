@@ -56,7 +56,10 @@ def render_estoque(conn):
 
     st.divider()
 
-    with st.expander("➕ Cadastrar novo produto", expanded=False):
+    st.subheader("➕ Cadastrar novo produto")
+    st.caption("Use este formulário para colocar um produto novo no estoque sem depender da planilha.")
+
+    with st.expander("Formulário de cadastro", expanded=True):
         with st.form("novo_produto_estoque_form"):
             col1, col2, col3 = st.columns(3)
 

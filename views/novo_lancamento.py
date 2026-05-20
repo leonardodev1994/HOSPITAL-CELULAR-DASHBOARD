@@ -1,9 +1,45 @@
 from datetime import datetime
 
+import pandas as pd
 import streamlit as st
 
 from database.database import execute_insert_returning_id
-from utils.estoque import load_stock, produto_label, reduce_stock
+from utils.dashboard_ui import moeda
+from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
+
+
+def _load_lancamentos(conn):
+    return pd.read_sql_query("""
+    SELECT
+        id,
+        data,
+        tipo,
+        descricao,
+        valor,
+        produto_id,
+        quantidade
+    FROM lancamentos
+    ORDER BY data DESC, id DESC
+    """, conn)
+
+
+def _delete_lancamento(conn, lancamento):
+    cursor = conn.cursor()
+    produto_id = lancamento.get("produto_id")
+    quantidade = lancamento.get("quantidade")
+
+    if lancamento.get("tipo") == "Produto" and produto_id and quantidade:
+        restore_stock(
+            conn,
+            int(produto_id),
+            float(quantidade),
+            lancamento_id=int(lancamento["id"]),
+            motivo="Venda removida",
+        )
+
+    cursor.execute("DELETE FROM pagamentos WHERE lancamento_id = ?", (int(lancamento["id"]),))
+    cursor.execute("DELETE FROM lancamentos WHERE id = ?", (int(lancamento["id"]),))
+    conn.commit()
 
 
 def render_novo_lancamento(conn):
@@ -107,3 +143,50 @@ def render_novo_lancamento(conn):
 
         conn.commit()
         st.success("✅ Lançamento salvo!")
+
+    st.divider()
+    st.subheader("🧾 Lançamentos recentes")
+
+    df_lancamentos = _load_lancamentos(conn)
+    if df_lancamentos.empty:
+        st.caption("Nenhum lançamento cadastrado.")
+        return
+
+    tabela = df_lancamentos.head(30).copy()
+    tabela = tabela.rename(columns={
+        "id": "ID",
+        "data": "Data",
+        "tipo": "Tipo",
+        "descricao": "Descrição",
+        "valor": "Valor",
+        "quantidade": "Qtd",
+    })
+
+    st.dataframe(
+        tabela[["ID", "Data", "Tipo", "Descrição", "Qtd", "Valor"]],
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+        },
+    )
+
+    with st.expander("Remover lançamento errado", expanded=False):
+        options = {
+            f"#{row.id} | {row.data} | {row.tipo} | {row.descricao} | {moeda(row.valor)}": row.id
+            for row in df_lancamentos.head(100).itertuples()
+        }
+        selected_label = st.selectbox("Selecione o lançamento", list(options.keys()))
+        selected_id = options[selected_label]
+        selected = df_lancamentos[df_lancamentos["id"] == selected_id].iloc[0].to_dict()
+
+        st.warning(
+            "Ao remover uma venda de produto, o sistema devolve a quantidade ao estoque "
+            "e apaga as formas de pagamento desse lançamento."
+        )
+        confirmar = st.checkbox("Confirmo que este lançamento foi feito errado e deve ser removido")
+
+        if st.button("Remover lançamento", type="primary", disabled=not confirmar):
+            _delete_lancamento(conn, selected)
+            st.success("✅ Lançamento removido.")
+            st.rerun()

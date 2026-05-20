@@ -236,7 +236,10 @@ def init_db(db_path="banco.db"):
 def init_postgres_db(database_url):
     import psycopg2
 
-    raw_conn = psycopg2.connect(database_url, sslmode="require")
+    if "sslmode=" in database_url:
+        raw_conn = psycopg2.connect(database_url)
+    else:
+        raw_conn = psycopg2.connect(database_url, sslmode="require")
     conn = PostgresConnection(raw_conn)
     cursor = conn.cursor()
 

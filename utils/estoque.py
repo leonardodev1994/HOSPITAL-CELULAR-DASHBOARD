@@ -303,6 +303,34 @@ def reduce_stock(conn, produto_id, quantidade, lancamento_id=None):
     )
 
 
+def restore_stock(conn, produto_id, quantidade, lancamento_id=None, motivo="Venda removida"):
+    if not produto_id or not quantidade:
+        return
+
+    cursor = conn.cursor()
+    produto = cursor.execute("SELECT quantidade FROM estoque WHERE id = ?", (produto_id,)).fetchone()
+
+    if not produto:
+        return
+
+    nova_quantidade = float(produto[0] or 0) + float(quantidade)
+    cursor.execute("""
+    UPDATE estoque
+    SET quantidade = ?, atualizado_em = CURRENT_TIMESTAMP
+    WHERE id = ?
+    """, (nova_quantidade, produto_id))
+    conn.commit()
+
+    register_stock_movement(
+        conn,
+        produto_id,
+        "Estorno",
+        quantidade,
+        motivo,
+        lancamento_id=lancamento_id,
+    )
+
+
 def adjust_stock(conn, produto_id, quantidade, valor_venda, estoque_minimo, observacao):
     cursor = conn.cursor()
     atual = cursor.execute("SELECT quantidade FROM estoque WHERE id = ?", (produto_id,)).fetchone()
