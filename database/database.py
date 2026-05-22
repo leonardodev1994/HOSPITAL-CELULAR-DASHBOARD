@@ -102,6 +102,45 @@ def init_db(db_path="banco.db"):
     """)
 
     cursor.execute("""
+    CREATE TABLE IF NOT EXISTS vendas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data TEXT,
+        total REAL,
+        status TEXT DEFAULT 'Ativa',
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS venda_itens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        venda_id INTEGER,
+        lancamento_id INTEGER,
+        tipo TEXT,
+        descricao TEXT,
+        produto_id INTEGER,
+        quantidade REAL,
+        valor_unitario REAL,
+        valor_total REAL
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS auditoria (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        acao TEXT,
+        entidade TEXT,
+        entidade_id INTEGER,
+        detalhes TEXT
+    )
+    """)
+
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS estoque (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         produto TEXT NOT NULL,
@@ -221,6 +260,8 @@ def init_db(db_path="banco.db"):
 
     _add_column_if_missing(cursor, "lancamentos", "produto_id", "INTEGER")
     _add_column_if_missing(cursor, "lancamentos", "quantidade", "REAL")
+    _add_column_if_missing(cursor, "lancamentos", "venda_id", "INTEGER")
+    _add_column_if_missing(cursor, "lancamentos", "venda_item_id", "INTEGER")
 
     _add_column_if_missing(cursor, "ordens_servico", "checklist_entrada", "TEXT")
     _add_column_if_missing(cursor, "ordens_servico", "checklist_reparo", "TEXT")
@@ -251,7 +292,9 @@ def init_postgres_db(database_url):
         descricao TEXT,
         valor DOUBLE PRECISION,
         produto_id INTEGER,
-        quantidade DOUBLE PRECISION
+        quantidade DOUBLE PRECISION,
+        venda_id INTEGER,
+        venda_item_id INTEGER
     )
     """)
 
@@ -261,6 +304,45 @@ def init_postgres_db(database_url):
         lancamento_id INTEGER,
         forma_pagamento TEXT,
         valor DOUBLE PRECISION
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS vendas (
+        id SERIAL PRIMARY KEY,
+        data TEXT,
+        total DOUBLE PRECISION,
+        status TEXT DEFAULT 'Ativa',
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS venda_itens (
+        id SERIAL PRIMARY KEY,
+        venda_id INTEGER,
+        lancamento_id INTEGER,
+        tipo TEXT,
+        descricao TEXT,
+        produto_id INTEGER,
+        quantidade DOUBLE PRECISION,
+        valor_unitario DOUBLE PRECISION,
+        valor_total DOUBLE PRECISION
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS auditoria (
+        id SERIAL PRIMARY KEY,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        acao TEXT,
+        entidade TEXT,
+        entidade_id INTEGER,
+        detalhes TEXT
     )
     """)
 
@@ -368,6 +450,11 @@ def init_postgres_db(database_url):
     """)
 
     conn.commit()
+    _add_postgres_column_if_missing(cursor, "lancamentos", "produto_id", "INTEGER")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "quantidade", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "venda_id", "INTEGER")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "venda_item_id", "INTEGER")
+    conn.commit()
     return conn
 
 
@@ -391,3 +478,7 @@ def _add_column_if_missing(cursor, table, column, column_type):
 
     if column not in columns:
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+
+
+def _add_postgres_column_if_missing(cursor, table, column, column_type):
+    cursor.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {column_type}")

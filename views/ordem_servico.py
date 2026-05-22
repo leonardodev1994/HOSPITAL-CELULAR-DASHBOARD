@@ -413,6 +413,41 @@ def _render_ordens_table(df_os):
     )
 
 
+def _render_status_board(df_os):
+    if df_os.empty:
+        return
+
+    st.markdown("#### Painel por status")
+    cols = st.columns(3)
+
+    for index, status in enumerate(STATUS_OS):
+        coluna = cols[index % 3]
+        df_status = df_os[df_os["status"] == status]
+        color, bg = STATUS_COLORS.get(status, ("#94A3B8", "#111827"))
+
+        with coluna:
+            st.markdown(
+                f"""
+                <div class="section-panel" style="border-left-color:{color};background:{bg};">
+                    <div class="section-panel-header">
+                        <div>
+                            <h3>{status}</h3>
+                            <p>{len(df_status)} ordem(ns)</p>
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            if df_status.empty:
+                st.caption("Sem OS neste status.")
+            else:
+                for row in df_status.head(4).itertuples():
+                    aparelho = f"{row.marca or ''} {row.modelo or ''}".strip()
+                    st.caption(f"#{str(row.id).zfill(5)} • {row.cliente or 'Sem cliente'} • {aparelho}")
+
+
 def _create_ordem(conn, data):
     cursor = conn.cursor()
     return execute_insert_returning_id(conn, cursor, """
@@ -736,6 +771,8 @@ def _render_lista_ordens(conn):
     df_os = _load_ordens_servico(conn)
 
     st.subheader("📋 Ordens cadastradas")
+    _render_status_board(df_os)
+    st.divider()
     _render_ordens_table(df_os)
 
     if df_os.empty:

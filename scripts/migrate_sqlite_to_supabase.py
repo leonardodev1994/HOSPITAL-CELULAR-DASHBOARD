@@ -15,12 +15,15 @@ TABLES = [
     "usuarios",
     "clientes",
     "estoque",
+    "vendas",
+    "venda_itens",
     "lancamentos",
     "pagamentos",
     "estoque_movimentacoes",
     "despesas",
     "caixa",
     "ordens_servico",
+    "auditoria",
 ]
 
 
