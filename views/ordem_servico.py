@@ -8,6 +8,7 @@ from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 
 from database.database import execute_insert_returning_id
+from utils.dashboard_ui import page_header
 from utils.pdf_os import generate_os_pdf
 from views.clientes import create_cliente, load_clientes
 
@@ -99,6 +100,117 @@ def _cliente_selecionado(df_clientes, cliente_id):
     return None if filtro.empty else filtro.iloc[0]
 
 
+def _digits(value):
+    return "".join(char for char in str(value or "") if char.isdigit())
+
+
+def _row_value(row, field, default=""):
+    if isinstance(row, pd.Series):
+        value = row.get(field, default)
+    else:
+        value = getattr(row, field, default)
+
+    return default if pd.isna(value) else value
+
+
+def _search_clientes(df_clientes, termo, limit=8):
+    termo = str(termo or "").strip()
+    if len(termo) < 2 or df_clientes.empty:
+        return df_clientes.head(0)
+
+    termo_lower = termo.lower()
+    termo_digits = _digits(termo)
+    mask = (
+        df_clientes["nome"].fillna("").str.lower().str.contains(termo_lower, regex=False)
+        | df_clientes["cpf"].fillna("").str.lower().str.contains(termo_lower, regex=False)
+        | df_clientes["telefone"].fillna("").str.lower().str.contains(termo_lower, regex=False)
+    )
+
+    if termo_digits:
+        cpf_digits = df_clientes["cpf"].fillna("").map(_digits)
+        telefone_digits = df_clientes["telefone"].fillna("").map(_digits)
+        mask = mask | cpf_digits.str.contains(termo_digits, regex=False) | telefone_digits.str.contains(termo_digits, regex=False)
+
+    return df_clientes[mask].head(limit)
+
+
+def _cliente_card(cliente):
+    documento = cliente.cpf or "Sem CPF/CNPJ"
+    telefone = cliente.telefone or "Sem telefone"
+    endereco = cliente.endereco or "Endereço não informado"
+    st.markdown(
+        f"""
+        <div class="client-search-card">
+            <div>
+                <strong>{cliente.nome}</strong>
+                <span>{telefone} • {documento}</span>
+                <small>{endereco}</small>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _apply_cliente_to_new_os(cliente):
+    st.session_state["nova_os_cliente_id"] = int(_row_value(cliente, "id", 0))
+    st.session_state["nova_os_nome"] = _row_value(cliente, "nome", "") or ""
+    st.session_state["nova_os_cpf"] = _row_value(cliente, "cpf", "") or ""
+    st.session_state["nova_os_tel"] = _row_value(cliente, "telefone", "") or ""
+    st.session_state["nova_os_end"] = _row_value(cliente, "endereco", "") or ""
+
+
+def _apply_cliente_to_edit_os(cliente, os_id):
+    st.session_state[f"edit_cliente_id_{os_id}"] = int(_row_value(cliente, "id", 0))
+    st.session_state[f"edit_cliente_{os_id}"] = _row_value(cliente, "nome", "") or ""
+    st.session_state[f"edit_cpf_{os_id}"] = _row_value(cliente, "cpf", "") or ""
+    st.session_state[f"edit_telefone_{os_id}"] = _row_value(cliente, "telefone", "") or ""
+    st.session_state[f"edit_endereco_{os_id}"] = _row_value(cliente, "endereco", "") or ""
+
+
+def _render_cliente_search(df_clientes, key_prefix, on_select, selected_id=None):
+    st.markdown(
+        """
+        <div class="client-search-title">
+            <span class="material-symbols-rounded">search</span>
+            <div>
+                <strong>Pesquisar cliente</strong>
+                <small>Busque por nome, CPF/CNPJ ou telefone/WhatsApp</small>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    termo = st.text_input(
+        "Buscar cliente",
+        placeholder="Digite parte do nome, CPF/CNPJ ou telefone...",
+        key=f"{key_prefix}_busca_cliente",
+        label_visibility="collapsed",
+    )
+
+    if selected_id:
+        cliente_atual = _cliente_selecionado(df_clientes, selected_id)
+        if cliente_atual is not None:
+            st.caption(f"Cliente selecionado: {cliente_atual['nome']} • {cliente_atual['telefone'] or 'sem telefone'}")
+
+    encontrados = _search_clientes(df_clientes, termo)
+    if termo.strip() and len(termo.strip()) < 2:
+        st.caption("Digite pelo menos 2 caracteres para pesquisar.")
+    elif termo.strip() and encontrados.empty:
+        st.info("Nenhum cliente encontrado. Preencha os dados abaixo para cadastrar/usar um novo cliente.")
+    elif not encontrados.empty:
+        st.markdown('<div class="client-search-list">', unsafe_allow_html=True)
+        for cliente in encontrados.itertuples():
+            col_info, col_action = st.columns([.78, .22])
+            with col_info:
+                _cliente_card(cliente)
+            with col_action:
+                if st.button("Usar cliente", key=f"{key_prefix}_usar_cliente_{cliente.id}", width="stretch"):
+                    on_select(cliente)
+                    st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _load_ordens_servico(conn):
     return pd.read_sql_query("""
     SELECT
@@ -115,6 +227,85 @@ def _load_ordens_servico(conn):
     FROM ordens_servico
     ORDER BY id DESC
     """, conn)
+
+
+def _load_ordens_por_cliente(conn, cliente):
+    cliente_id = int(cliente.id) if getattr(cliente, "id", None) is not None else None
+    nome = getattr(cliente, "nome", "") or ""
+    cpf = getattr(cliente, "cpf", "") or ""
+    telefone = getattr(cliente, "telefone", "") or ""
+
+    return pd.read_sql_query("""
+    SELECT
+        id,
+        data,
+        cliente,
+        cpf,
+        telefone,
+        marca,
+        modelo,
+        servico,
+        valor,
+        garantia,
+        status
+    FROM ordens_servico
+    WHERE cliente_id = ?
+       OR cpf = ?
+       OR telefone = ?
+       OR cliente LIKE ?
+    ORDER BY id DESC
+    """, conn, params=(cliente_id, cpf, telefone, f"%{nome}%"))
+
+
+def _search_ordens_texto(conn, termo, limit=10):
+    termo = str(termo or "").strip()
+    termo_digits = _digits(termo)
+    like_term = f"%{termo}%"
+    digit_like = f"%{termo_digits}%"
+
+    if len(termo) < 2:
+        return pd.DataFrame()
+
+    if termo_digits:
+        return pd.read_sql_query("""
+        SELECT
+            id,
+            data,
+            cliente,
+            cpf,
+            telefone,
+            marca,
+            modelo,
+            servico,
+            valor,
+            garantia,
+            status
+        FROM ordens_servico
+        WHERE cliente LIKE ?
+           OR cpf LIKE ?
+           OR telefone LIKE ?
+        ORDER BY id DESC
+        LIMIT ?
+        """, conn, params=(like_term, digit_like, digit_like, limit))
+
+    return pd.read_sql_query("""
+    SELECT
+        id,
+        data,
+        cliente,
+        cpf,
+        telefone,
+        marca,
+        modelo,
+        servico,
+        valor,
+        garantia,
+        status
+    FROM ordens_servico
+    WHERE cliente LIKE ?
+    ORDER BY id DESC
+    LIMIT ?
+    """, conn, params=(like_term, limit))
 
 
 def _load_ordem_detalhe(conn, os_id):
@@ -413,6 +604,98 @@ def _render_ordens_table(df_os):
     )
 
 
+def _render_os_result_table(df_os):
+    rows = []
+    for row in df_os.itertuples():
+        rows.append({
+            "OS": f"#{str(row.id).zfill(5)}",
+            "Data": row.data,
+            "Cliente": row.cliente,
+            "Aparelho": f"{row.marca or ''} {row.modelo or ''}".strip() or "-",
+            "Serviço": row.servico or "-",
+            "Status": row.status or "-",
+            "Valor": row.valor or 0,
+        })
+
+    st.dataframe(
+        pd.DataFrame(rows),
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+        },
+    )
+
+
+def _render_os_lookup(conn):
+    df_clientes = load_clientes(conn, somente_ativos=True)
+
+    st.markdown(
+        """
+        <div class="os-lookup-panel">
+            <div class="os-lookup-icon">
+                OS
+            </div>
+            <div>
+                <span class="os-lookup-eyebrow">Consulta rápida</span>
+                <strong>Cliente e andamento da OS</strong>
+                <small>Pesquise por nome, CPF/CNPJ ou telefone/WhatsApp para acompanhar serviços.</small>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    termo = st.text_input(
+        "Pesquisar cliente ou ordem de serviço",
+        placeholder="Digite nome, CPF/CNPJ ou WhatsApp...",
+        key="os_lookup_cliente_status",
+        label_visibility="collapsed",
+    )
+    termo_limpo = termo.strip()
+
+    if not termo_limpo:
+        st.caption("Use a busca acima para acompanhar serviços de um cliente antes de abrir uma nova OS.")
+        return
+
+    if len(termo_limpo) < 2:
+        st.caption("Digite pelo menos 2 caracteres para pesquisar.")
+        return
+
+    clientes = _search_clientes(df_clientes, termo_limpo, limit=6)
+    if clientes.empty:
+        st.info("Nenhum cliente cadastrado encontrado. Vou procurar em ordens antigas pelo texto digitado.")
+        ordens = _search_ordens_texto(conn, termo_limpo)
+        if ordens.empty:
+            st.warning("Nenhuma ordem de serviço encontrada para essa pesquisa.")
+        else:
+            _render_os_result_table(ordens)
+        return
+
+    for cliente in clientes.itertuples():
+        ordens_cliente = _load_ordens_por_cliente(conn, cliente)
+        ultima_os = ordens_cliente.iloc[0] if not ordens_cliente.empty else None
+        status_html = _status_badge(ultima_os["status"]) if ultima_os is not None else "<span class='status-badge muted'>Sem OS</span>"
+
+        st.markdown(
+            f"""
+            <div class="os-lookup-client">
+                <div>
+                    <strong>{cliente.nome}</strong>
+                    <span>{cliente.telefone or 'Sem telefone'} • {cliente.cpf or 'Sem CPF/CNPJ'}</span>
+                </div>
+                <div>{status_html}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if ordens_cliente.empty:
+            st.caption("Este cliente ainda não possui ordem de serviço cadastrada.")
+        else:
+            _render_os_result_table(ordens_cliente)
+
+
 def _render_status_board(df_os):
     if df_os.empty:
         return
@@ -487,6 +770,7 @@ def _update_ordem(conn, os_id, data):
     UPDATE ordens_servico
     SET
         data = ?,
+        cliente_id = ?,
         cliente = ?,
         cpf = ?,
         telefone = ?,
@@ -515,7 +799,6 @@ def _update_ordem(conn, os_id, data):
 
 
 def _render_nova_os(conn):
-    cursor = conn.cursor()
     df_clientes = load_clientes(conn, somente_ativos=True)
 
     with st.expander("➕ Nova Ordem de Serviço", expanded=False):
@@ -529,20 +812,46 @@ def _render_nova_os(conn):
             loja = st.text_input("Loja", key="nova_os_loja")
 
         st.markdown("#### Cliente")
+        if "nova_os_cliente_id" not in st.session_state:
+            st.session_state["nova_os_cliente_id"] = None
+        for field in ["nova_os_nome", "nova_os_cpf", "nova_os_tel", "nova_os_end"]:
+            st.session_state.setdefault(field, "")
+
         options = _cliente_options(df_clientes)
-        cliente_label = st.selectbox("Cliente cadastrado", list(options.keys()), key="nova_os_cliente_select")
-        cliente_id = options[cliente_label]
-        cliente_atual = _cliente_selecionado(df_clientes, cliente_id)
+        cliente_opcao = st.selectbox(
+            "Cliente cadastrado (opcional)",
+            list(options.keys()),
+            key="nova_os_cliente_select",
+        )
+        cliente_opcao_id = options[cliente_opcao]
+
+        col_preencher, col_limpar = st.columns([1, 1])
+        with col_preencher:
+            if cliente_opcao_id and st.button("Preencher dados do cliente", key="nova_os_preencher_cliente"):
+                cliente_row = _cliente_selecionado(df_clientes, cliente_opcao_id)
+                if cliente_row is not None:
+                    _apply_cliente_to_new_os(cliente_row)
+                    st.rerun()
+        with col_limpar:
+            if st.button("Usar cliente novo/manual", key="nova_os_cliente_manual"):
+                st.session_state["nova_os_cliente_id"] = None
+                st.session_state["nova_os_nome"] = ""
+                st.session_state["nova_os_cpf"] = ""
+                st.session_state["nova_os_tel"] = ""
+                st.session_state["nova_os_end"] = ""
+                st.rerun()
+
+        cliente_id = st.session_state.get("nova_os_cliente_id")
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            cliente = st.text_input("Nome do Cliente", value="" if cliente_atual is None else cliente_atual["nome"], key=f"nova_nome_{cliente_id or 'novo'}")
+            cliente = st.text_input("Nome do Cliente", key="nova_os_nome")
         with col2:
-            cpf = st.text_input("CPF", value="" if cliente_atual is None else cliente_atual["cpf"] or "", key=f"nova_cpf_{cliente_id or 'novo'}")
+            cpf = st.text_input("CPF/CNPJ", key="nova_os_cpf")
         with col3:
-            telefone = st.text_input("Telefone", value="" if cliente_atual is None else cliente_atual["telefone"] or "", key=f"nova_tel_{cliente_id or 'novo'}")
+            telefone = st.text_input("Telefone/WhatsApp", key="nova_os_tel")
 
-        endereco = st.text_area("Endereço", value="" if cliente_atual is None else cliente_atual["endereco"] or "", key=f"nova_end_{cliente_id or 'novo'}")
+        endereco = st.text_area("Endereço", key="nova_os_end")
         salvar_cliente = cliente_id is None and st.checkbox("Salvar este cliente no cadastro", value=True)
 
         st.markdown("#### Aparelho e serviço")
@@ -623,14 +932,28 @@ def _render_edit_form(conn, os_id):
     ])
 
     with tab_dados:
+        df_clientes = load_clientes(conn, somente_ativos=True)
+        st.markdown("#### Cliente da OS")
+        st.session_state.setdefault(f"edit_cliente_id_{os_id}", os_data.get("cliente_id"))
+        st.session_state.setdefault(f"edit_cliente_{os_id}", os_data.get("cliente") or "")
+        st.session_state.setdefault(f"edit_cpf_{os_id}", os_data.get("cpf") or "")
+        st.session_state.setdefault(f"edit_telefone_{os_id}", os_data.get("telefone") or "")
+        st.session_state.setdefault(f"edit_endereco_{os_id}", os_data.get("endereco") or "")
+        _render_cliente_search(
+            df_clientes,
+            f"edit_{os_id}",
+            lambda cliente_row: _apply_cliente_to_edit_os(cliente_row, os_id),
+            st.session_state.get(f"edit_cliente_id_{os_id}"),
+        )
+
         col1, col2, col3 = st.columns(3)
         with col1:
             data_os = st.date_input("Data", _date_value(os_data.get("data")), key=f"edit_data_{os_id}")
-            cliente = st.text_input("Cliente", value=os_data.get("cliente") or "", key=f"edit_cliente_{os_id}")
-            telefone = st.text_input("Telefone", value=os_data.get("telefone") or "", key=f"edit_telefone_{os_id}")
+            cliente = st.text_input("Cliente", key=f"edit_cliente_{os_id}")
+            telefone = st.text_input("Telefone/WhatsApp", key=f"edit_telefone_{os_id}")
         with col2:
             atendente = st.text_input("Atendente", value=os_data.get("atendente") or "", key=f"edit_atendente_{os_id}")
-            cpf = st.text_input("CPF", value=os_data.get("cpf") or "", key=f"edit_cpf_{os_id}")
+            cpf = st.text_input("CPF/CNPJ", key=f"edit_cpf_{os_id}")
             loja = st.text_input("Loja", value=os_data.get("loja") or "", key=f"edit_loja_{os_id}")
         with col3:
             status = _select_value("Status", STATUS_OS, os_data.get("status") or "Em análise", f"edit_status_{os_id}")
@@ -644,7 +967,7 @@ def _render_edit_form(conn, os_id):
             )
             valor = st.number_input("Valor", min_value=0.0, value=float(os_data.get("valor") or 0), key=f"edit_valor_{os_id}")
 
-        endereco = st.text_area("Endereço", value=os_data.get("endereco") or "", key=f"edit_endereco_{os_id}")
+        endereco = st.text_area("Endereço", key=f"edit_endereco_{os_id}")
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -740,6 +1063,7 @@ def _render_edit_form(conn, os_id):
 
         _update_ordem(conn, os_id, (
             str(data_os),
+            st.session_state.get(f"edit_cliente_id_{os_id}"),
             cliente,
             cpf,
             telefone,
@@ -812,9 +1136,13 @@ def _render_lista_ordens(conn):
 
 
 def render_ordem_servico(conn):
-    st.subheader("📋 Ordem de Serviço")
-    st.caption("Cadastre, edite, acompanhe por status e imprima a OS no mesmo lugar.")
+    page_header(
+        "Ordem de Serviço",
+        "Consulte clientes, acompanhe status, abra novas OS e imprima documentos técnicos.",
+    )
 
+    _render_os_lookup(conn)
+    st.divider()
     _render_nova_os(conn)
     st.divider()
     _render_lista_ordens(conn)

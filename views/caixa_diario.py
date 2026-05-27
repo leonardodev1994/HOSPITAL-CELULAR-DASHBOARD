@@ -1,8 +1,9 @@
 from datetime import datetime
 
 import pandas as pd
-import plotly.express as px
 import streamlit as st
+
+from utils.dashboard_ui import pie_chart
 
 
 def _pagamentos_do_dia(conn, data):
@@ -79,12 +80,5 @@ def render_caixa_diario(conn):
     if df_pagamentos.empty:
         st.info("Nenhum pagamento cadastrado hoje.")
     else:
-        fig = px.pie(
-            df_pagamentos,
-            names="forma_pagamento",
-            values="valor",
-            hole=0.5,
-            template="plotly_dark",
-            title="Formas de Pagamento",
-        )
+        fig = pie_chart(df_pagamentos, "forma_pagamento", "valor", "Formas de Pagamento")
         st.plotly_chart(fig, width="stretch")
