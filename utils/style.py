@@ -72,6 +72,23 @@ def apply_style():
         box-shadow: var(--shadow-soft) !important;
     }
 
+    [data-testid="collapsedControl"] button *,
+    [data-testid="stSidebarCollapseButton"] button * {
+        color: var(--text) !important;
+    }
+
+    [data-testid="collapsedControl"] svg,
+    [data-testid="stSidebarCollapseButton"] svg {
+        color: var(--text) !important;
+        stroke: var(--text) !important;
+        fill: none !important;
+    }
+
+    [data-testid="collapsedControl"] svg path,
+    [data-testid="stSidebarCollapseButton"] svg path {
+        stroke: var(--text) !important;
+    }
+
     .stApp,
     .stApp p,
     .stApp span,
