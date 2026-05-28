@@ -34,7 +34,6 @@ def apply_style():
         padding: 1.35rem 1.75rem 3rem;
     }
 
-    [data-testid="stToolbar"],
     #MainMenu,
     footer {
         visibility: hidden;
@@ -48,6 +47,21 @@ def apply_style():
         backdrop-filter: blur(10px);
         border-bottom: 1px solid rgba(228, 231, 236, .8);
         pointer-events: auto !important;
+        z-index: 999998 !important;
+    }
+
+    [data-testid="stHeader"] *,
+    [data-testid="stToolbar"],
+    [data-testid="stToolbar"] * {
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    [data-testid="stToolbar"] {
+        display: flex !important;
+        height: auto !important;
+        min-height: 44px !important;
     }
 
     [data-testid="collapsedControl"] {
@@ -72,21 +86,57 @@ def apply_style():
         box-shadow: var(--shadow-soft) !important;
     }
 
+    button[aria-label*="sidebar"],
+    button[aria-label*="Sidebar"],
+    button[title*="sidebar"],
+    button[title*="Sidebar"],
+    [data-testid="stBaseButton-header"],
+    [data-testid="stBaseButton-headerNoPadding"] {
+        min-width: 42px !important;
+        min-height: 42px !important;
+        color: var(--text) !important;
+        background: #FFFFFF !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius) !important;
+        box-shadow: var(--shadow-soft) !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
     [data-testid="collapsedControl"] button *,
-    [data-testid="stSidebarCollapseButton"] button * {
+    [data-testid="stSidebarCollapseButton"] button *,
+    button[aria-label*="sidebar"] *,
+    button[aria-label*="Sidebar"] *,
+    button[title*="sidebar"] *,
+    button[title*="Sidebar"] *,
+    [data-testid="stBaseButton-header"] *,
+    [data-testid="stBaseButton-headerNoPadding"] * {
         color: var(--text) !important;
     }
 
     [data-testid="collapsedControl"] svg,
-    [data-testid="stSidebarCollapseButton"] svg {
+    [data-testid="stSidebarCollapseButton"] svg,
+    button[aria-label*="sidebar"] svg,
+    button[aria-label*="Sidebar"] svg,
+    button[title*="sidebar"] svg,
+    button[title*="Sidebar"] svg,
+    [data-testid="stBaseButton-header"] svg,
+    [data-testid="stBaseButton-headerNoPadding"] svg {
         color: var(--text) !important;
         stroke: var(--text) !important;
-        fill: none !important;
+        fill: var(--text) !important;
     }
 
     [data-testid="collapsedControl"] svg path,
-    [data-testid="stSidebarCollapseButton"] svg path {
+    [data-testid="stSidebarCollapseButton"] svg path,
+    button[aria-label*="sidebar"] svg path,
+    button[aria-label*="Sidebar"] svg path,
+    button[title*="sidebar"] svg path,
+    button[title*="Sidebar"] svg path,
+    [data-testid="stBaseButton-header"] svg path,
+    [data-testid="stBaseButton-headerNoPadding"] svg path {
         stroke: var(--text) !important;
+        fill: var(--text) !important;
     }
 
     .stApp,
