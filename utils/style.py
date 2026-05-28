@@ -218,6 +218,32 @@ def apply_style():
         font-size: .98rem;
     }
 
+    .st-key-mobile_nav {
+        display: none;
+    }
+
+    .mobile-user {
+        background: #F9FAFB;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        margin: 0 0 12px;
+    }
+
+    .mobile-user span,
+    .mobile-user small {
+        display: block;
+        color: var(--muted) !important;
+        font-size: .78rem;
+    }
+
+    .mobile-user strong {
+        display: block;
+        margin-top: 5px;
+        color: var(--text) !important;
+        font-size: .98rem;
+    }
+
     .nav-caption {
         margin: 4px 0 12px;
         color: #98A2B3 !important;
@@ -761,6 +787,7 @@ def apply_style():
         .main .block-container {
             padding-left: 1rem;
             padding-right: 1rem;
+            padding-top: 4.25rem;
         }
 
         [data-testid="stHeader"] {
@@ -776,6 +803,48 @@ def apply_style():
         [data-testid="stSidebarCollapseButton"] button {
             min-width: 44px !important;
             min-height: 44px !important;
+        }
+
+        .st-key-mobile_nav {
+            display: block;
+            margin-bottom: 1rem;
+        }
+
+        .st-key-mobile_nav details {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-soft);
+            overflow: hidden;
+        }
+
+        .st-key-mobile_nav summary {
+            min-height: 48px;
+            padding: 12px 14px !important;
+            font-weight: 850;
+            color: var(--text) !important;
+        }
+
+        .st-key-mobile_nav [data-testid="stExpanderDetails"] {
+            border-top: 1px solid var(--border);
+            padding: 12px 14px 14px;
+        }
+
+        .st-key-mobile_nav div[role="radiogroup"] {
+            gap: 7px;
+        }
+
+        .st-key-mobile_nav div[role="radiogroup"] label {
+            min-height: 42px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: #FFFFFF;
+            padding: 9px 11px;
+        }
+
+        .st-key-mobile_nav div[role="radiogroup"] label:has(input:checked) {
+            border-color: rgba(230, 57, 70, .55);
+            background: #FFF1F2;
         }
 
         .dash-hero,

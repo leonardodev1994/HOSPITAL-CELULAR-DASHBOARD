@@ -73,57 +73,101 @@ MENU_ICONS = {
     "Backup": ":material/cloud_upload:",
 }
 
+
+def _set_menu(menu_label: str):
+    st.session_state["menu_atual"] = menu_label
+
+
+def _set_menu_from_mobile():
+    selected = st.session_state.get("menu_mobile")
+    if selected in MENU_ITEMS:
+        _set_menu(selected)
+
+
+def render_mobile_navigation(user, auto_backup):
+    current_menu = st.session_state["menu_atual"]
+    if st.session_state.get("menu_mobile") != current_menu:
+        st.session_state["menu_mobile"] = current_menu
+
+    with st.container(key="mobile_nav"):
+        with st.expander("☰ Menu / Categorias", expanded=False):
+            st.markdown(
+                f"""
+                <div class="mobile-user">
+                    <span>Usuário ativo</span>
+                    <strong>{user['nome']}</strong>
+                    <small>{user['perfil']}</small>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if auto_backup:
+                st.success(f"Backup automático criado: {auto_backup.name}")
+            st.radio(
+                "Ir para:",
+                list(MENU_ITEMS.keys()),
+                key="menu_mobile",
+                on_change=_set_menu_from_mobile,
+            )
+            if st.button("Sair", key="mobile_logout", width="stretch", icon=":material/logout:"):
+                logout()
+
+
+def render_sidebar_navigation(user, auto_backup):
+    if LOGO_PATH.exists():
+        logo = Image.open(LOGO_PATH)
+        st.sidebar.image(logo, width=178)
+
+    st.sidebar.markdown(
+        """
+        <div class="sidebar-brand">
+            <h2>Hospital do Celular</h2>
+            <p>Assistência técnica, estoque e vendas</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.sidebar.markdown(
+        f"""
+        <div class="sidebar-user">
+            <span>Usuário ativo</span>
+            <strong>{user['nome']}</strong>
+            <small>{user['perfil']}</small>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if auto_backup:
+        st.sidebar.success(f"Backup automático criado: {auto_backup.name}")
+
+    st.sidebar.markdown('<div class="nav-caption">Navegação</div>', unsafe_allow_html=True)
+    for group_name, group_items in MENU_GROUPS.items():
+        st.sidebar.markdown(f'<div class="nav-group">{group_name}</div>', unsafe_allow_html=True)
+        for menu_label in group_items:
+            is_active = st.session_state["menu_atual"] == menu_label
+            icon = MENU_ICONS.get(menu_label)
+            if st.sidebar.button(
+                menu_label,
+                key=f"nav_{menu_label}",
+                width="stretch",
+                type="primary" if is_active else "secondary",
+                icon=icon,
+            ):
+                _set_menu(menu_label)
+                st.rerun()
+
+    st.sidebar.divider()
+
+    if st.sidebar.button("Sair", width="stretch", icon=":material/logout:"):
+        logout()
+
+
 if "menu_atual" not in st.session_state or st.session_state["menu_atual"] not in MENU_ITEMS:
     st.session_state["menu_atual"] = "Dashboard Geral"
 
-if LOGO_PATH.exists():
-    logo = Image.open(LOGO_PATH)
-    st.sidebar.image(logo, width=178)
-
-st.sidebar.markdown(
-    """
-    <div class="sidebar-brand">
-        <h2>Hospital do Celular</h2>
-        <p>Assistência técnica, estoque e vendas</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-st.sidebar.markdown(
-    f"""
-    <div class="sidebar-user">
-        <span>Usuário ativo</span>
-        <strong>{user['nome']}</strong>
-        <small>{user['perfil']}</small>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-if auto_backup:
-    st.sidebar.success(f"Backup automático criado: {auto_backup.name}")
-
-st.sidebar.markdown('<div class="nav-caption">Navegação</div>', unsafe_allow_html=True)
-for group_name, group_items in MENU_GROUPS.items():
-    st.sidebar.markdown(f'<div class="nav-group">{group_name}</div>', unsafe_allow_html=True)
-    for menu_label in group_items:
-        is_active = st.session_state["menu_atual"] == menu_label
-        icon = MENU_ICONS.get(menu_label)
-        if st.sidebar.button(
-            menu_label,
-            key=f"nav_{menu_label}",
-            width="stretch",
-            type="primary" if is_active else "secondary",
-            icon=icon,
-        ):
-            st.session_state["menu_atual"] = menu_label
-            st.rerun()
-
+render_sidebar_navigation(user, auto_backup)
+render_mobile_navigation(user, auto_backup)
 menu = st.session_state["menu_atual"]
-
-st.sidebar.divider()
-
-if st.sidebar.button("Sair", width="stretch", icon=":material/logout:"):
-    logout()
 
 MENU_ITEMS[menu](conn)
