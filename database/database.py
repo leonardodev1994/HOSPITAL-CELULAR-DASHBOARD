@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 
 
 def _get_database_url():
@@ -77,9 +78,83 @@ def init_db(db_path="banco.db"):
     database_url = _get_database_url()
 
     if database_url:
-        return init_postgres_db(database_url)
+        return connect_postgres(database_url)
 
-    conn = sqlite3.connect(db_path, check_same_thread=False)
+    return connect_sqlite(db_path)
+
+
+def connect_sqlite(db_path="banco.db"):
+    return sqlite3.connect(db_path, check_same_thread=False)
+
+
+def connect_postgres(database_url):
+    import psycopg2
+
+    if "sslmode=" in database_url:
+        raw_conn = psycopg2.connect(database_url)
+    else:
+        raw_conn = psycopg2.connect(database_url, sslmode="require")
+    return PostgresConnection(raw_conn)
+
+
+MIGRATIONS = [
+    ("0001_initial_schema", "_migration_0001_initial_schema"),
+]
+
+
+def initialize_database(conn):
+    _ensure_migration_history(conn)
+    applied = _applied_migrations(conn)
+
+    for migration_id, migration_name in MIGRATIONS:
+        if migration_id in applied:
+            continue
+
+        migration = globals()[migration_name]
+        try:
+            migration(conn)
+            _record_migration(conn, migration_id)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def _ensure_migration_history(conn):
+    cursor = conn.cursor()
+    timestamp_type = "TIMESTAMP" if getattr(conn, "backend", "sqlite") == "postgres" else "TEXT"
+    cursor.execute(f"""
+    CREATE TABLE IF NOT EXISTS migration_history (
+        id TEXT PRIMARY KEY,
+        applied_at {timestamp_type} DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    conn.commit()
+
+
+def _applied_migrations(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM migration_history")
+    return {row[0] for row in cursor.fetchall()}
+
+
+def _record_migration(conn, migration_id):
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO migration_history (id) VALUES (?)",
+        (migration_id,),
+    )
+
+
+def _migration_0001_initial_schema(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_schema(conn)
+        return
+
+    _create_sqlite_schema(conn)
+
+
+def _create_sqlite_schema(conn):
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -270,19 +345,11 @@ def init_db(db_path="banco.db"):
     _add_column_if_missing(cursor, "ordens_servico", "assinatura_entrada", "TEXT")
     _add_column_if_missing(cursor, "ordens_servico", "assinatura_saida", "TEXT")
 
-    conn.commit()
-    return conn
 
-
-def init_postgres_db(database_url):
-    import psycopg2
-
-    if "sslmode=" in database_url:
-        raw_conn = psycopg2.connect(database_url)
-    else:
-        raw_conn = psycopg2.connect(database_url, sslmode="require")
-    conn = PostgresConnection(raw_conn)
+def _create_postgres_schema(conn):
     cursor = conn.cursor()
+
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS lancamentos (
@@ -449,13 +516,10 @@ def init_postgres_db(database_url):
     )
     """)
 
-    conn.commit()
     _add_postgres_column_if_missing(cursor, "lancamentos", "produto_id", "INTEGER")
     _add_postgres_column_if_missing(cursor, "lancamentos", "quantidade", "DOUBLE PRECISION")
     _add_postgres_column_if_missing(cursor, "lancamentos", "venda_id", "INTEGER")
     _add_postgres_column_if_missing(cursor, "lancamentos", "venda_item_id", "INTEGER")
-    conn.commit()
-    return conn
 
 
 def execute_insert_returning_id(conn, cursor, query, params):
@@ -481,4 +545,22 @@ def _add_column_if_missing(cursor, table, column, column_type):
 
 
 def _add_postgres_column_if_missing(cursor, table, column, column_type):
-    cursor.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {column_type}")
+    cursor.execute(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = ?
+          AND column_name = ?
+        LIMIT 1
+        """,
+        (table, column),
+    )
+    if cursor.fetchone():
+        print(f"[migration] ALTER TABLE {table} ADD COLUMN {column} skipped; column exists")
+        return
+
+    started_at = time.perf_counter()
+    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+    elapsed = time.perf_counter() - started_at
+    print(f"[migration] ALTER TABLE {table} ADD COLUMN {column} finished in {elapsed:.3f}s")

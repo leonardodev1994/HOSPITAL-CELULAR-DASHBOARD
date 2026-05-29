@@ -2,7 +2,7 @@ import streamlit as st
 from PIL import Image
 from pathlib import Path
 
-from database.database import init_db
+from database.database import init_db, initialize_database
 from utils.backup import run_daily_auto_backup
 from views.caixa_diario import render_caixa_diario
 from views.backup import render_backup
@@ -30,6 +30,17 @@ st.set_page_config(
 
 apply_style()
 
+
+@st.cache_resource(show_spinner=False)
+def ensure_database_initialized():
+    migration_conn = init_db()
+    try:
+        initialize_database(migration_conn)
+    finally:
+        migration_conn.close()
+
+
+ensure_database_initialized()
 conn = init_db()
 
 if not require_login(conn):
