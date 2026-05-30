@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.dashboard_ui import pie_chart
+from utils.permissions import has_permission
 from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
 
 
@@ -43,9 +44,12 @@ def render_caixa_diario(conn):
             st.success("✅ Caixa aberto!")
 
     df_pagamentos = _pagamentos_do_dia(conn, hoje)
-    where_despesas, params_despesas = scope_clause()
     where_caixa, params_caixa = scope_clause()
-    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    if has_permission("view_expenses"):
+        where_despesas, params_despesas = scope_clause()
+        df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    else:
+        df_despesas = pd.DataFrame(columns=["data", "valor"])
     df_caixa = pd.read_sql_query(f"SELECT * FROM caixa{where_caixa}", conn, params=params_caixa)
 
     despesas_hoje = df_despesas[df_despesas["data"] == hoje]
@@ -65,11 +69,15 @@ def render_caixa_diario(conn):
     caixa_final = abertura + dinheiro - total_despesas
     total_geral = dinheiro + pix + credito + debito
 
-    c1, c2, c3, c4 = st.columns(4)
+    cols = st.columns(4 if has_permission("view_expenses") else 3)
+    c1, c2 = cols[:2]
     c1.metric("🌅 Abertura", f"R$ {abertura:.2f}")
     c2.metric("💵 Dinheiro", f"R$ {dinheiro:.2f}")
-    c3.metric("💸 Despesas", f"R$ {total_despesas:.2f}")
-    c4.metric("🧾 Caixa Atual", f"R$ {caixa_final:.2f}")
+    if has_permission("view_expenses"):
+        cols[2].metric("💸 Despesas", f"R$ {total_despesas:.2f}")
+        cols[3].metric("🧾 Caixa Atual", f"R$ {caixa_final:.2f}")
+    else:
+        cols[2].metric("🧾 Recebido em dinheiro", f"R$ {dinheiro:.2f}")
 
     st.divider()
 

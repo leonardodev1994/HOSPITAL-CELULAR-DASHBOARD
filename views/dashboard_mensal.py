@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.dashboard_ui import bar_chart, empty_state, metric_card, moeda, page_header, pie_chart
+from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause
 
 
@@ -36,10 +37,16 @@ def _period_label(start, end):
 
 
 def render_dashboard_mensal(conn):
+    if not require_permission("view_dashboard_monthly"):
+        return
+
     where_lancamentos, params_lancamentos = scope_clause()
-    where_despesas, params_despesas = scope_clause()
     df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
-    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    if has_permission("view_profit"):
+        where_despesas, params_despesas = scope_clause()
+        df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    else:
+        df_despesas = pd.DataFrame(columns=["data", "valor"])
 
     min_date, max_date = _date_bounds(df)
 
@@ -103,15 +110,17 @@ def render_dashboard_mensal(conn):
     media_dia = faturamento / dias_periodo
     projecao = media_dia * 30
 
-    c1, c2, c3, c4 = st.columns(4)
+    cols = st.columns(4 if has_permission("view_profit") else 3)
+    c1, c2, c3 = cols[:3]
     with c1:
         metric_card("Faturamento", moeda(faturamento), f"Média/dia: {moeda(media_dia)}", "#5B8DEF")
     with c2:
         metric_card("Serviços", moeda(servicos), "Receita de reparos", "#18C29C")
     with c3:
         metric_card("Produtos", moeda(produtos), "Receita de vendas", "#F59E0B")
-    with c4:
-        metric_card("Lucro estimado", moeda(lucro), f"Projeção 30d: {moeda(projecao)}", "#EF4444")
+    if has_permission("view_profit"):
+        with cols[3]:
+            metric_card("Lucro estimado", moeda(lucro), f"Projeção 30d: {moeda(projecao)}", "#EF4444")
 
     st.divider()
 

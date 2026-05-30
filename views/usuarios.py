@@ -2,10 +2,8 @@ import pandas as pd
 import streamlit as st
 
 from utils.auth import current_user, hash_password
+from utils.permissions import PERFIS
 from utils.quiosques import load_quiosques
-
-
-PERFIS = ["Admin", "Atendente", "Técnico"]
 
 
 def _load_users(conn):

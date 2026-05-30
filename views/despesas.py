@@ -3,10 +3,14 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+from utils.permissions import require_permission
 from utils.quiosques import current_quiosque_id, scope_clause
 
 
 def render_despesas(conn):
+    if not require_permission("view_expenses"):
+        return
+
     cursor = conn.cursor()
 
     st.subheader("💸 Nova Despesa")

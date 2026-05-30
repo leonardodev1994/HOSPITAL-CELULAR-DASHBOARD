@@ -2,16 +2,23 @@ import pandas as pd
 import streamlit as st
 
 from utils.dashboard_ui import bar_chart, empty_state, metric_card, moeda, page_header, pie_chart
+from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause
 
 
 def render_dashboard_geral(conn):
+    if not require_permission("view_dashboard_general"):
+        return
+
     where_lancamentos, params_lancamentos = scope_clause()
     where_pagamentos, params_pagamentos = scope_clause("pagamentos")
-    where_despesas, params_despesas = scope_clause()
     df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
     df_pagamentos = pd.read_sql_query(f"SELECT * FROM pagamentos{where_pagamentos}", conn, params=params_pagamentos)
-    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    if has_permission("view_profit"):
+        where_despesas, params_despesas = scope_clause()
+        df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    else:
+        df_despesas = pd.DataFrame(columns=["valor"])
 
     page_header(
         "Dashboard Geral",
@@ -25,15 +32,17 @@ def render_dashboard_geral(conn):
     servicos = df[df["tipo"] == "Serviço"]["valor"].sum() if not df.empty else 0
     produtos = df[df["tipo"] == "Produto"]["valor"].sum() if not df.empty else 0
 
-    c1, c2, c3, c4 = st.columns(4)
+    cols = st.columns(4 if has_permission("view_profit") else 3)
+    c1, c2, c3 = cols[:3]
     with c1:
         metric_card("Faturamento", moeda(faturamento), "Receita total lançada", "#5B8DEF")
     with c2:
         metric_card("Serviços", moeda(servicos), "Reparos e mão de obra", "#18C29C")
     with c3:
         metric_card("Produtos", moeda(produtos), "Produtos vendidos", "#F59E0B")
-    with c4:
-        metric_card("Lucro estimado", moeda(lucro), f"Despesas: {moeda(despesas)}", "#EF4444")
+    if has_permission("view_profit"):
+        with cols[3]:
+            metric_card("Lucro estimado", moeda(lucro), f"Despesas: {moeda(despesas)}", "#EF4444")
 
     st.divider()
 

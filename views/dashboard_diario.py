@@ -11,6 +11,7 @@ from utils.dashboard_ui import (
     page_header,
     pie_chart,
 )
+from utils.permissions import has_permission
 from utils.quiosques import scope_clause, scoped_params
 
 
@@ -202,9 +203,12 @@ def _render_tabela_operacional(df_lancamentos, df_pagamentos, tipo, titulo, acce
 
 def render_dashboard_diario(conn):
     where_lancamentos, params_lancamentos = scope_clause()
-    where_despesas, params_despesas = scope_clause()
     df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
-    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    if has_permission("view_profit"):
+        where_despesas, params_despesas = scope_clause()
+        df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    else:
+        df_despesas = pd.DataFrame(columns=["data", "valor"])
 
     min_date, max_date = _safe_date_range(df)
     selected_date = st.date_input(
@@ -243,15 +247,17 @@ def render_dashboard_diario(conn):
     meta = 1000
     progresso = min(total / meta, 1.0)
 
-    c1, c2, c3, c4 = st.columns(4)
+    cols = st.columns(4 if has_permission("view_profit") else 3)
+    c1, c2, c3 = cols[:3]
     with c1:
         metric_card("Faturamento", _moeda(total), diferenca_label, "#5B8DEF")
     with c2:
         metric_card("Serviços", _moeda(servicos), f"{len(df_dia[df_dia['tipo'] == 'Serviço']) if not df_dia.empty else 0} lançamentos", "#18C29C")
     with c3:
         metric_card("Produtos", _moeda(produtos), f"{len(df_dia[df_dia['tipo'] == 'Produto']) if not df_dia.empty else 0} vendas", "#F59E0B")
-    with c4:
-        metric_card("Lucro estimado", _moeda(lucro), f"Despesas: {_moeda(despesas)}", "#EF4444")
+    if has_permission("view_profit"):
+        with cols[3]:
+            metric_card("Lucro estimado", _moeda(lucro), f"Despesas: {_moeda(despesas)}", "#EF4444")
 
     st.divider()
 

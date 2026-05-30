@@ -8,6 +8,7 @@ from utils.audit import log_action
 from utils.auth import current_user
 from utils.dashboard_ui import moeda
 from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
+from utils.permissions import has_permission
 from utils.quiosques import current_quiosque_id, scope_clause
 
 
@@ -445,6 +446,9 @@ def render_novo_lancamento(conn):
             "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
         },
     )
+
+    if not has_permission("delete_records"):
+        return
 
     with st.expander("Remover lançamento errado", expanded=False):
         options = {

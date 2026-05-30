@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+from utils.permissions import has_permission
+
 
 DEFAULT_QUIOSQUE_ID = 1
 ALL_QUIOSQUES_ID = 0
@@ -24,7 +26,7 @@ def load_quiosques(conn, active_only=True):
 
 def user_can_view_all(user=None):
     user = user or st.session_state.get("usuario_logado") or {}
-    return bool(user.get("acesso_todos_quiosques")) or user.get("perfil") == "Admin"
+    return bool(user.get("acesso_todos_quiosques")) and has_permission("view_all_quiosques", user)
 
 
 def user_quiosque_id(user=None):

@@ -9,6 +9,7 @@ from streamlit_drawable_canvas import st_canvas
 
 from database.database import execute_insert_returning_id
 from utils.dashboard_ui import page_header
+from utils.permissions import has_permission
 from utils.pdf_os import generate_os_pdf
 from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
 from views.clientes import create_cliente, load_clientes
@@ -930,6 +931,7 @@ def _render_edit_form(conn, os_id):
     if not os_data:
         st.warning("OS não encontrada.")
         return
+    can_edit_values = has_permission("edit_financial_values")
 
     entrada = _json_load(os_data.get("checklist_entrada"))
     reparo = _json_load(os_data.get("checklist_reparo"))
@@ -980,7 +982,13 @@ def _render_edit_form(conn, os_id):
                 else 0,
                 key=f"edit_garantia_{os_id}",
             )
-            valor = st.number_input("Valor", min_value=0.0, value=float(os_data.get("valor") or 0), key=f"edit_valor_{os_id}")
+            valor = st.number_input(
+                "Valor",
+                min_value=0.0,
+                value=float(os_data.get("valor") or 0),
+                key=f"edit_valor_{os_id}",
+                disabled=not can_edit_values,
+            )
 
         endereco = st.text_area("Endereço", key=f"edit_endereco_{os_id}")
 
@@ -1049,6 +1057,7 @@ def _render_edit_form(conn, os_id):
             min_value=0.0,
             value=float(pagamento.get("valor") or os_data.get("valor") or 0),
             key=f"pagamento_valor_{os_id}",
+            disabled=not can_edit_values,
         )
         pagamento["forma"] = _select_value("Forma de pagamento", FORMAS_PAGAMENTO, pagamento.get("forma", "Dinheiro"), f"pagamento_forma_{os_id}")
         pagamento["numero_nf"] = st.text_input("Número da NF", value=pagamento.get("numero_nf", ""), key=f"pagamento_nf_{os_id}")

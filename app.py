@@ -16,6 +16,7 @@ from views.novo_lancamento import render_novo_lancamento
 from views.ordem_servico import render_ordem_servico
 from views.usuarios import render_usuarios
 from utils.auth import current_user, logout, require_login
+from utils.permissions import MENU_PERMISSIONS, has_permission, visible_menu_items
 from utils.quiosques import render_quiosque_filter
 from utils.style import apply_style
 
@@ -116,7 +117,7 @@ def render_mobile_navigation(user, auto_backup):
                 st.success(f"Backup automático criado: {auto_backup.name}")
             st.radio(
                 "Ir para:",
-                list(MENU_ITEMS.keys()),
+                visible_menu_items(list(MENU_ITEMS.keys()), user),
                 key="menu_mobile",
                 on_change=_set_menu_from_mobile,
             )
@@ -154,8 +155,12 @@ def render_sidebar_navigation(user, auto_backup):
 
     st.sidebar.markdown('<div class="nav-caption">Navegação</div>', unsafe_allow_html=True)
     for group_name, group_items in MENU_GROUPS.items():
+        visible_items = visible_menu_items(group_items, user)
+        if not visible_items:
+            continue
+
         st.sidebar.markdown(f'<div class="nav-group">{group_name}</div>', unsafe_allow_html=True)
-        for menu_label in group_items:
+        for menu_label in visible_items:
             is_active = st.session_state["menu_atual"] == menu_label
             icon = MENU_ICONS.get(menu_label)
             if st.sidebar.button(
@@ -174,8 +179,14 @@ def render_sidebar_navigation(user, auto_backup):
         logout()
 
 
-if "menu_atual" not in st.session_state or st.session_state["menu_atual"] not in MENU_ITEMS:
-    st.session_state["menu_atual"] = "Dashboard Geral"
+available_menu_items = visible_menu_items(list(MENU_ITEMS.keys()), user)
+
+if (
+    "menu_atual" not in st.session_state
+    or st.session_state["menu_atual"] not in MENU_ITEMS
+    or not has_permission(MENU_PERMISSIONS.get(st.session_state["menu_atual"]), user)
+):
+    st.session_state["menu_atual"] = available_menu_items[0]
 
 render_sidebar_navigation(user, auto_backup)
 render_mobile_navigation(user, auto_backup)
