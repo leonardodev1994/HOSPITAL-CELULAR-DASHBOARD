@@ -8,10 +8,12 @@ from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 
 from database.database import execute_insert_returning_id
+from utils.audit import log_action
+from utils.auth import current_user
 from utils.dashboard_ui import page_header
 from utils.permissions import has_permission
 from utils.pdf_os import generate_os_pdf
-from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
+from utils.quiosques import current_quiosque_id, scope_clause
 from views.clientes import create_cliente, load_clientes
 
 
@@ -19,18 +21,18 @@ STATUS_OS = [
     "Em análise",
     "Em reparo",
     "Aguardando peça",
-    "Finalizado",
     "Entregue",
+    "Finalizado",
     "Cancelado",
 ]
 
 STATUS_COLORS = {
-    "Finalizado": ("#16A34A", "#052E16"),
-    "Entregue": ("#06B6D4", "#083344"),
-    "Cancelado": ("#DC2626", "#450A0A"),
-    "Aguardando peça": ("#EAB308", "#422006"),
-    "Em reparo": ("#6366F1", "#1E1B4B"),
-    "Em análise": ("#94A3B8", "#111827"),
+    "Finalizado": ("#15803D", "#DCFCE7"),
+    "Entregue": ("#0E7490", "#CFFAFE"),
+    "Cancelado": ("#B91C1C", "#FEE2E2"),
+    "Aguardando peça": ("#A16207", "#FEF3C7"),
+    "Em reparo": ("#4338CA", "#E0E7FF"),
+    "Em análise": ("#475569", "#F1F5F9"),
 }
 
 TEST_OPTIONS = ["Ok", "Defeito", "Não Testado"]
@@ -342,6 +344,14 @@ def _money(value):
         return "R$ 0.00"
 
 
+def _display_value(value):
+    if value is None:
+        return ""
+    if isinstance(value, float) and pd.isna(value):
+        return ""
+    return str(value)
+
+
 def _date_value(value):
     try:
         return pd.to_datetime(value).date()
@@ -355,18 +365,6 @@ def _status_badge(status):
         f"<span class='status-badge' "
         f"style='border-color:{color};background:{bg};color:{color};'>"
         f"{status}</span>"
-    )
-
-
-def _pdf_button(os_id, os_data):
-    nome_arquivo = f"OS_{str(os_id).zfill(5)}_{os_data.get('cliente') or 'cliente'}.pdf"
-    nome_arquivo = nome_arquivo.replace(" ", "_").replace("/", "-").replace("\\", "-")
-    st.download_button(
-        "Baixar PDF",
-        data=generate_os_pdf(os_data),
-        file_name=nome_arquivo,
-        mime="application/pdf",
-        key=f"pdf_{os_id}",
     )
 
 
@@ -398,7 +396,7 @@ def _is_image_file(path):
     return Path(str(path)).suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]
 
 
-def _render_file_preview(label, path):
+def _render_file_preview(label, path, key_context=""):
     if not path:
         return
 
@@ -407,7 +405,7 @@ def _render_file_preview(label, path):
         return
 
     file_path = Path(path)
-    file_key = abs(hash(str(file_path)))
+    file_key = abs(hash(f"{key_context}:{str(file_path)}"))
 
     if _is_image_file(file_path):
         st.caption(label)
@@ -487,7 +485,7 @@ def _render_upload(label, current, os_id, field_key, scope):
 
     if current_path and not st.session_state.get(delete_key):
         _existing_file_label(current_path)
-        _render_file_preview(label, current_path)
+        _render_file_preview(label, current_path, key_context=f"edit_{os_id}_{scope}_{field_key}")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -612,32 +610,6 @@ def _signature_value_after_save(canvas_result, os_id, field, current_value):
     return current_value or ""
 
 
-def _render_ordens_table(df_os):
-    if df_os.empty:
-        st.info("Nenhuma OS cadastrada.")
-        return
-
-    rows = []
-    for row in df_os.itertuples():
-        rows.append({
-            "OS": row.id,
-            "Cliente": row.cliente,
-            "Aparelho": f"{row.marca or ''} {row.modelo or ''}".strip(),
-            "Serviço": row.servico,
-            "Valor": row.valor,
-            "Status": row.status,
-        })
-
-    st.dataframe(
-        pd.DataFrame(rows),
-        width="stretch",
-        hide_index=True,
-        column_config={
-            "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
-        },
-    )
-
-
 def _render_os_result_table(df_os):
     rows = []
     for row in df_os.itertuples():
@@ -730,39 +702,158 @@ def _render_os_lookup(conn):
             _render_os_result_table(ordens_cliente)
 
 
-def _render_status_board(df_os):
-    if df_os.empty:
+def _collect_os_photos(os_data):
+    photo_fields = [
+        ("Entrada frontal", "checklist_entrada", "foto_frente"),
+        ("Entrada traseira", "checklist_entrada", "foto_tras"),
+        ("Entrada extra", "checklist_entrada", "foto_extra"),
+        ("Reparo interno", "checklist_reparo", "foto_interna"),
+        ("Reparo extra", "checklist_reparo", "foto_interna_extra"),
+        ("Peça", "checklist_reparo", "foto_peca"),
+        ("Saída frontal", "checklist_saida", "foto_frente"),
+        ("Saída traseira", "checklist_saida", "foto_tras"),
+        ("Saída extra", "checklist_saida", "foto_extra"),
+        ("Comprovante", "pagamento_os", "foto_comprovante"),
+    ]
+
+    photos = []
+    for label, json_field, photo_key in photo_fields:
+        value = _json_load(os_data.get(json_field)).get(photo_key)
+        if value:
+            photos.append((label, value))
+    return photos
+
+
+def _render_os_photo_gallery(os_id, os_data):
+    photos = _collect_os_photos(os_data)
+    if not photos:
+        st.caption("Nenhuma foto anexada nesta OS.")
         return
 
-    st.markdown("#### Painel por status")
+    st.markdown("##### Fotos da OS")
     cols = st.columns(3)
+    for index, (label, path) in enumerate(photos):
+        with cols[index % 3]:
+            _render_file_preview(label, path, key_context=f"os_{os_id}_gallery_{index}")
 
-    for index, status in enumerate(STATUS_OS):
-        coluna = cols[index % 3]
-        df_status = df_os[df_os["status"] == status]
-        color, bg = STATUS_COLORS.get(status, ("#94A3B8", "#111827"))
 
-        with coluna:
-            st.markdown(
-                f"""
-                <div class="section-panel" style="border-left-color:{color};background:{bg};">
-                    <div class="section-panel-header">
-                        <div>
-                            <h3>{status}</h3>
-                            <p>{len(df_status)} ordem(ns)</p>
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+def _render_os_history(conn, os_id):
+    history = _load_os_history(conn, os_id)
+    if history.empty:
+        st.caption("Nenhuma alteração registrada ainda.")
+        return
 
-            if df_status.empty:
-                st.caption("Sem OS neste status.")
-            else:
-                for row in df_status.head(4).itertuples():
-                    aparelho = f"{row.marca or ''} {row.modelo or ''}".strip()
-                    st.caption(f"#{str(row.id).zfill(5)} • {row.cliente or 'Sem cliente'} • {aparelho}")
+    rows = history.rename(columns={
+        "data_hora": "Data/Hora",
+        "usuario_nome": "Usuário",
+        "campo": "Campo",
+        "valor_antigo": "Valor antigo",
+        "valor_novo": "Valor novo",
+    })
+    st.dataframe(rows, width="stretch", hide_index=True)
+
+
+def _render_admin_notifications(conn):
+    if not has_permission("delete_records"):
+        return
+
+    notifications = _load_admin_notifications(conn)
+    unread = 0 if notifications.empty else int((notifications["lida"] == 0).sum())
+
+    with st.expander(f"🔔 Notificações do admin ({unread} novas)", expanded=False):
+        if notifications.empty:
+            st.caption("Nenhuma notificação de OS por enquanto.")
+            return
+
+        if unread and st.button("Marcar notificações como lidas", width="stretch"):
+            _mark_admin_notifications_read(conn)
+            st.rerun()
+
+        for row in notifications.itertuples():
+            marker = "●" if int(row.lida or 0) == 0 else "○"
+            st.markdown(f"**{marker} {row.titulo}**")
+            st.caption(f"{row.data_hora} · {row.mensagem}")
+
+
+def _os_header(row):
+    aparelho = f"{row.marca or ''} {row.modelo or ''}".strip() or "Aparelho não informado"
+    cliente = row.cliente or "Sem cliente"
+    return f"OS #{str(row.id).zfill(5)} | {cliente} | {aparelho} | {_money(row.valor)}"
+
+
+def _render_os_details(conn, row):
+    os_data = _load_ordem_detalhe(conn, row.id)
+    if not os_data:
+        st.warning("OS não encontrada.")
+        return
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.caption("Cliente")
+        st.write(os_data.get("cliente") or "Não informado")
+        st.caption("Telefone")
+        st.write(os_data.get("telefone") or "Não informado")
+    with col2:
+        st.caption("Aparelho")
+        aparelho = f"{os_data.get('marca') or ''} {os_data.get('modelo') or ''}".strip()
+        st.write(aparelho or "Não informado")
+        st.caption("Serviço")
+        st.write(os_data.get("servico") or "Não informado")
+    with col3:
+        st.caption("Status")
+        st.write(os_data.get("status") or "Não informado")
+        st.caption("Valor")
+        st.write(_money(os_data.get("valor")))
+
+    if os_data.get("observacoes"):
+        st.caption("Observações")
+        st.write(os_data.get("observacoes"))
+
+    _render_os_photo_gallery(row.id, os_data)
+
+    st.divider()
+    action_cols = st.columns(3)
+    with action_cols[0]:
+        if st.button("✏️ Editar", key=f"editar_os_{row.id}", width="stretch"):
+            edit_key = f"os_edit_aberta_{row.id}"
+            st.session_state[edit_key] = not st.session_state.get(edit_key, False)
+            st.rerun()
+    with action_cols[1]:
+        st.download_button(
+            "🖨️ Imprimir",
+            data=generate_os_pdf(os_data),
+            file_name=f"OS_{str(row.id).zfill(5)}.pdf",
+            mime="application/pdf",
+            key=f"pdf_inline_{row.id}",
+        )
+    with action_cols[2]:
+        if has_permission("delete_records"):
+            delete_key = f"os_delete_confirm_{row.id}"
+            if st.button("🗑️ Excluir", key=f"excluir_os_{row.id}", width="stretch"):
+                st.session_state[delete_key] = not st.session_state.get(delete_key, False)
+                st.rerun()
+
+    if has_permission("delete_records") and st.session_state.get(f"os_delete_confirm_{row.id}"):
+        st.warning("Confirme a exclusão desta OS. Essa ação remove o registro da lista.")
+        confirmar = st.checkbox("Confirmo que desejo excluir esta OS", key=f"confirmar_excluir_os_{row.id}")
+        if st.button("Excluir definitivamente", key=f"excluir_os_final_{row.id}", disabled=not confirmar):
+            user = current_user()
+            _delete_ordem(conn, row.id)
+            log_action(conn, user, "excluiu_os", "ordens_servico", row.id, {"cliente": os_data.get("cliente")})
+            st.success("OS excluída.")
+            st.rerun()
+
+    if has_permission("delete_records"):
+        history_key = f"os_history_aberto_{row.id}"
+        if st.button("Histórico de alterações", key=f"historico_os_{row.id}", width="stretch"):
+            st.session_state[history_key] = not st.session_state.get(history_key, False)
+            st.rerun()
+        if st.session_state.get(history_key):
+            _render_os_history(conn, row.id)
+
+    if st.session_state.get(f"os_edit_aberta_{row.id}"):
+        st.divider()
+        _render_edit_form(conn, row.id)
 
 
 def _create_ordem(conn, data):
@@ -831,6 +922,120 @@ def _update_ordem(conn, os_id, data):
         assinatura_saida = ?
     WHERE id = ?
     """ + scope, (*data, os_id) + params)
+    conn.commit()
+
+
+def _delete_ordem(conn, os_id):
+    cursor = conn.cursor()
+    scope, params = scope_clause(prefix="AND")
+    cursor.execute("DELETE FROM ordens_servico WHERE id = ?" + scope, (os_id,) + params)
+    conn.commit()
+
+
+def _record_os_changes(conn, os_id, old_data, new_data, user):
+    changed = []
+    for field, new_value in new_data.items():
+        old_value = old_data.get(field)
+        old_text = _display_value(old_value)
+        new_text = _display_value(new_value)
+        if old_text != new_text:
+            changed.append((field, old_text, new_text))
+
+    if not changed:
+        return []
+
+    quiosque_id = int(old_data.get("quiosque_id") or current_quiosque_id(user))
+    cursor = conn.cursor()
+    for field, old_text, new_text in changed:
+        cursor.execute("""
+        INSERT INTO os_historico_alteracoes (
+            os_id,
+            usuario_id,
+            usuario_nome,
+            campo,
+            valor_antigo,
+            valor_novo,
+            quiosque_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            os_id,
+            None if not user else user.get("id"),
+            "Sistema" if not user else user.get("nome"),
+            field,
+            old_text,
+            new_text,
+            quiosque_id,
+        ))
+
+    summary = ", ".join(field for field, _, _ in changed[:6])
+    if len(changed) > 6:
+        summary += f" e mais {len(changed) - 6} campo(s)"
+
+    cursor.execute("""
+    INSERT INTO notificacoes_admin (
+        tipo,
+        titulo,
+        mensagem,
+        entidade,
+        entidade_id,
+        quiosque_id
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        "os_alterada",
+        f"OS #{str(os_id).zfill(5)} alterada",
+        f"{'Sistema' if not user else user.get('nome')} alterou: {summary}.",
+        "ordens_servico",
+        os_id,
+        quiosque_id,
+    ))
+    conn.commit()
+
+    return changed
+
+
+def _load_os_history(conn, os_id):
+    return pd.read_sql_query("""
+    SELECT
+        data_hora,
+        usuario_nome,
+        campo,
+        valor_antigo,
+        valor_novo
+    FROM os_historico_alteracoes
+    WHERE os_id = ?
+    ORDER BY id DESC
+    """, conn, params=(os_id,))
+
+
+def _load_admin_notifications(conn):
+    scope, params = scope_clause(prefix="AND")
+    return pd.read_sql_query("""
+    SELECT
+        id,
+        data_hora,
+        titulo,
+        mensagem,
+        entidade_id,
+        lida
+    FROM notificacoes_admin
+    WHERE entidade = 'ordens_servico'
+    """ + scope + """
+    ORDER BY id DESC
+    LIMIT 20
+    """, conn, params=params)
+
+
+def _mark_admin_notifications_read(conn):
+    scope, params = scope_clause(prefix="AND")
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE notificacoes_admin
+    SET lida = 1
+    WHERE entidade = 'ordens_servico'
+      AND lida = 0
+    """ + scope, params)
     conn.commit()
 
 
@@ -1128,6 +1333,7 @@ def _render_edit_form(conn, os_id):
 
         try:
             st.session_state[saving_key] = True
+            user = current_user()
             assinatura_entrada = _signature_value_after_save(
                 assinatura_entrada_canvas,
                 os_id,
@@ -1141,32 +1347,69 @@ def _render_edit_form(conn, os_id):
                 assinatura_saida_atual,
             )
 
+            new_data = {
+                "data": str(data_os),
+                "cliente_id": st.session_state.get(f"edit_cliente_id_{os_id}"),
+                "cliente": cliente,
+                "cpf": cpf,
+                "telefone": telefone,
+                "endereco": endereco,
+                "atendente": atendente,
+                "loja": loja,
+                "marca": marca,
+                "modelo": modelo,
+                "imei": imei,
+                "senha": senha,
+                "defeito": defeito,
+                "servico": servico,
+                "valor": valor,
+                "garantia": garantia,
+                "status": status,
+                "observacoes": observacoes,
+                "checklist_entrada": _json_dump(entrada),
+                "checklist_reparo": _json_dump(reparo),
+                "checklist_saida": _json_dump(saida),
+                "pagamento_os": _json_dump(pagamento),
+                "assinatura_entrada": assinatura_entrada,
+                "assinatura_saida": assinatura_saida,
+            }
+
             _update_ordem(conn, os_id, (
-                str(data_os),
-                st.session_state.get(f"edit_cliente_id_{os_id}"),
-                cliente,
-                cpf,
-                telefone,
-                endereco,
-                atendente,
-                loja,
-                marca,
-                modelo,
-                imei,
-                senha,
-                defeito,
-                servico,
-                valor,
-                garantia,
-                status,
-                observacoes,
-                _json_dump(entrada),
-                _json_dump(reparo),
-                _json_dump(saida),
-                _json_dump(pagamento),
-                assinatura_entrada,
-                assinatura_saida,
+                new_data["data"],
+                new_data["cliente_id"],
+                new_data["cliente"],
+                new_data["cpf"],
+                new_data["telefone"],
+                new_data["endereco"],
+                new_data["atendente"],
+                new_data["loja"],
+                new_data["marca"],
+                new_data["modelo"],
+                new_data["imei"],
+                new_data["senha"],
+                new_data["defeito"],
+                new_data["servico"],
+                new_data["valor"],
+                new_data["garantia"],
+                new_data["status"],
+                new_data["observacoes"],
+                new_data["checklist_entrada"],
+                new_data["checklist_reparo"],
+                new_data["checklist_saida"],
+                new_data["pagamento_os"],
+                new_data["assinatura_entrada"],
+                new_data["assinatura_saida"],
             ))
+            changes = _record_os_changes(conn, os_id, os_data, new_data, user)
+            if changes:
+                log_action(
+                    conn,
+                    user,
+                    "editou_os",
+                    "ordens_servico",
+                    os_id,
+                    {"campos": [field for field, _, _ in changes]},
+                )
             st.success("✅ OS atualizada!")
             st.rerun()
         finally:
@@ -1177,44 +1420,39 @@ def _render_lista_ordens(conn):
     df_os = _load_ordens_servico(conn)
 
     st.subheader("📋 Ordens cadastradas")
-    _render_status_board(df_os)
-    st.divider()
-    _render_ordens_table(df_os)
-
     if df_os.empty:
+        st.info("Nenhuma OS cadastrada.")
         return
 
-    st.divider()
-    st.markdown("#### Editar ou imprimir")
+    for status in STATUS_OS:
+        df_status = df_os[df_os["status"].fillna("") == status]
+        with st.expander(f"{status} ({len(df_status)})", expanded=False):
+            if df_status.empty:
+                st.caption("Nenhuma OS neste status.")
+                continue
 
-    for row in df_os.itertuples():
-        os_data = _load_ordem_detalhe(conn, row.id)
-        title = f"OS #{str(row.id).zfill(5)} - {row.cliente or 'Sem cliente'} - {row.marca or ''} {row.modelo or ''}"
+            for row in df_status.itertuples():
+                open_key = f"os_aberta_{row.id}"
+                if st.button(_os_header(row), key=f"abrir_os_{row.id}", width="stretch"):
+                    st.session_state[open_key] = not st.session_state.get(open_key, False)
+                    st.rerun()
 
-        with st.expander(title, expanded=False):
-            color, _ = STATUS_COLORS.get(row.status, ("#94A3B8", "#111827"))
-            st.markdown(
-                f"""
-                <div class="os-card" style="border-left-color:{color};">
-                    <div>
-                        <strong>{row.cliente or 'Sem cliente'}</strong><br>
-                        <span>{row.telefone or ''}</span><br>
-                        <span>{row.servico or ''}</span>
-                    </div>
-                    <div>{_status_badge(row.status)}</div>
-                    <div><strong>{_money(row.valor)}</strong></div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                if st.session_state.get(open_key):
+                    with st.container(border=True):
+                        _render_os_details(conn, row)
 
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                _pdf_button(row.id, os_data)
-            with col2:
-                st.caption("Use as abas abaixo para corrigir dados, atualizar status, anexar fotos e completar o checklist.")
+    df_outros = df_os[~df_os["status"].fillna("").isin(STATUS_OS)]
+    if not df_outros.empty:
+        with st.expander(f"Outros status ({len(df_outros)})", expanded=False):
+            for row in df_outros.itertuples():
+                open_key = f"os_aberta_{row.id}"
+                if st.button(_os_header(row), key=f"abrir_os_{row.id}", width="stretch"):
+                    st.session_state[open_key] = not st.session_state.get(open_key, False)
+                    st.rerun()
 
-            _render_edit_form(conn, row.id)
+                if st.session_state.get(open_key):
+                    with st.container(border=True):
+                        _render_os_details(conn, row)
 
 
 def render_ordem_servico(conn):
@@ -1223,6 +1461,7 @@ def render_ordem_servico(conn):
         "Consulte clientes, acompanhe status, abra novas OS e imprima documentos técnicos.",
     )
 
+    _render_admin_notifications(conn)
     _render_os_lookup(conn)
     st.divider()
     _render_nova_os(conn)

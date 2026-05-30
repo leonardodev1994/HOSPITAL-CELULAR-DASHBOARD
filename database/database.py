@@ -101,6 +101,7 @@ MIGRATIONS = [
     ("0001_initial_schema", "_migration_0001_initial_schema"),
     ("0002_quiosques", "_migration_0002_quiosques"),
     ("0003_renomeia_quiosques", "_migration_0003_renomeia_quiosques"),
+    ("0004_os_history_notifications", "_migration_0004_os_history_notifications"),
 ]
 
 
@@ -191,6 +192,14 @@ def _migration_0003_renomeia_quiosques(conn):
     cursor = conn.cursor()
     _seed_quiosques(cursor)
     _rename_quiosque_users(conn)
+
+
+def _migration_0004_os_history_notifications(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_os_audit_schema(conn)
+        return
+
+    _create_sqlite_os_audit_schema(conn)
 
 
 def ensure_quiosques_schema(conn):
@@ -616,6 +625,73 @@ def _create_postgres_quiosque_schema(conn):
     cursor.execute("UPDATE usuarios SET acesso_todos_quiosques = 1 WHERE perfil = 'Admin'")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_quiosque_id ON usuarios(quiosque_id)")
     _seed_quiosque_users(conn)
+
+
+def _create_sqlite_os_audit_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS os_historico_alteracoes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        os_id INTEGER NOT NULL,
+        data_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        campo TEXT NOT NULL,
+        valor_antigo TEXT,
+        valor_novo TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS notificacoes_admin (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+        tipo TEXT,
+        titulo TEXT,
+        mensagem TEXT,
+        entidade TEXT,
+        entidade_id INTEGER,
+        lida INTEGER NOT NULL DEFAULT 0,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_os_historico_os_id ON os_historico_alteracoes(os_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notificacoes_admin_lida ON notificacoes_admin(lida)")
+
+
+def _create_postgres_os_audit_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS os_historico_alteracoes (
+        id SERIAL PRIMARY KEY,
+        os_id INTEGER NOT NULL,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        campo TEXT NOT NULL,
+        valor_antigo TEXT,
+        valor_novo TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS notificacoes_admin (
+        id SERIAL PRIMARY KEY,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        tipo TEXT,
+        titulo TEXT,
+        mensagem TEXT,
+        entidade TEXT,
+        entidade_id INTEGER,
+        lida INTEGER NOT NULL DEFAULT 0,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_os_historico_os_id ON os_historico_alteracoes(os_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_os_historico_quiosque_id ON os_historico_alteracoes(quiosque_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notificacoes_admin_lida ON notificacoes_admin(lida)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notificacoes_admin_quiosque_id ON notificacoes_admin(quiosque_id)")
 
 
 def _seed_quiosques(cursor):
