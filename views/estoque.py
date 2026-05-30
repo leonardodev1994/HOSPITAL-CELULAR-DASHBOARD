@@ -35,6 +35,9 @@ def _stock_table(df):
 
 def render_estoque(conn):
     can_manage_stock = has_permission("manage_stock")
+    st.session_state.setdefault("estoque_form_aberto", False)
+    st.session_state.setdefault("estoque_salvando", False)
+    st.session_state.setdefault("estoque_ajuste_salvando", False)
 
     page_header(
         "Estoque",
@@ -60,10 +63,15 @@ def render_estoque(conn):
     st.divider()
 
     if can_manage_stock:
-        st.subheader("➕ Cadastrar novo produto")
-        st.caption("Use este formulário para colocar um produto novo no estoque sem depender da planilha.")
+        if not st.session_state["estoque_form_aberto"]:
+            if st.button("➕ Cadastrar produto", width="stretch"):
+                st.session_state["estoque_form_aberto"] = True
+                st.rerun()
 
-        with st.expander("Formulário de cadastro", expanded=True):
+        if st.session_state["estoque_form_aberto"]:
+            st.subheader("➕ Cadastrar novo produto")
+            st.caption("Use este formulário para colocar um produto novo no estoque sem depender da planilha.")
+
             with st.form("novo_produto_estoque_form"):
                 col1, col2, col3 = st.columns(3)
 
@@ -80,10 +88,19 @@ def render_estoque(conn):
                     estoque_minimo = st.number_input("Estoque mínimo", min_value=0.0, value=1.0, step=1.0)
 
                 observacao = st.text_area("Observação")
-                submitted = st.form_submit_button("Salvar produto")
+                col_salvar, col_cancelar = st.columns(2)
+                with col_salvar:
+                    submitted = st.form_submit_button("Salvar produto", disabled=st.session_state["estoque_salvando"])
+                with col_cancelar:
+                    cancel = st.form_submit_button("Cancelar")
 
-            if submitted:
+            if cancel:
+                st.session_state["estoque_form_aberto"] = False
+                st.rerun()
+
+            if submitted and not st.session_state["estoque_salvando"]:
                 try:
+                    st.session_state["estoque_salvando"] = True
                     _, updated = add_stock_product(
                         conn,
                         produto,
@@ -98,11 +115,14 @@ def render_estoque(conn):
                         st.success("✅ Produto já existia. A quantidade foi somada ao estoque.")
                     else:
                         st.success("✅ Produto cadastrado no estoque.")
+                    st.session_state["estoque_form_aberto"] = False
                     st.rerun()
                 except ValueError as error:
                     st.error(str(error))
                 except Exception as error:
                     st.error(f"Erro ao salvar produto: {error}")
+                finally:
+                    st.session_state["estoque_salvando"] = False
 
         with st.expander("Importar planilha de estoque", expanded=df.empty):
             st.caption("Películas serão consolidadas automaticamente como Película 3D.")
@@ -189,10 +209,17 @@ def render_estoque(conn):
 
     observacao = st.text_area("Observação", value=selected["observacao"] or "")
 
-    if st.button("Salvar ajuste", width="stretch"):
-        adjust_stock(conn, produto_id, quantidade, valor_venda, estoque_minimo, observacao)
-        st.success("✅ Estoque atualizado.")
-        st.rerun()
+    if st.button("Salvar ajuste", width="stretch", disabled=st.session_state["estoque_ajuste_salvando"]):
+        if st.session_state["estoque_ajuste_salvando"]:
+            return
+
+        try:
+            st.session_state["estoque_ajuste_salvando"] = True
+            adjust_stock(conn, produto_id, quantidade, valor_venda, estoque_minimo, observacao)
+            st.success("✅ Estoque atualizado.")
+            st.rerun()
+        finally:
+            st.session_state["estoque_ajuste_salvando"] = False
 
     st.divider()
     st.subheader("Movimentações recentes")

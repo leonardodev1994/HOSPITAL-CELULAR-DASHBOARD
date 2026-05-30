@@ -251,6 +251,7 @@ def render_novo_lancamento(conn):
     df_estoque = load_stock(conn)
     items = _cart_items()
     user = current_user()
+    st.session_state.setdefault("venda_salvando", False)
 
     st.subheader("➕ Novo Lançamento")
     data = st.date_input("Data da venda", datetime.today())
@@ -391,7 +392,10 @@ def render_novo_lancamento(conn):
     c1.metric("Total pago", moeda(total_pagamentos))
     c2.metric("Diferença", moeda(diferenca))
 
-    if st.button("Salvar venda", width="stretch", type="primary"):
+    if st.button("Salvar venda", width="stretch", type="primary", disabled=st.session_state["venda_salvando"]):
+        if st.session_state["venda_salvando"]:
+            return
+
         if not items:
             st.error("Adicione ao menos um produto ou serviço.")
             return
@@ -410,11 +414,14 @@ def render_novo_lancamento(conn):
             return
 
         try:
+            st.session_state["venda_salvando"] = True
             _save_cart(conn, data, items, pagamentos, user=user)
         except Exception as error:
             conn.rollback()
             st.error(f"Erro ao salvar venda: {error}")
             return
+        finally:
+            st.session_state["venda_salvando"] = False
 
         _clear_cart()
         st.success("✅ Venda salva com todos os itens!")

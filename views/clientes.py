@@ -116,45 +116,86 @@ def _clientes_table(df_clientes):
     ]]
 
 
+def _reset_new_cliente_form():
+    for key in [
+        "cliente_novo_nome",
+        "cliente_novo_cpf",
+        "cliente_novo_telefone",
+        "cliente_novo_email",
+        "cliente_novo_endereco",
+        "cliente_novo_observacoes",
+    ]:
+        st.session_state.pop(key, None)
+    st.session_state.pop("cliente_novo_ativo", None)
+
+
 def render_clientes(conn):
     st.subheader("👤 Clientes")
 
-    with st.expander("➕ Cadastrar novo cliente", expanded=False):
+    st.session_state.setdefault("cliente_form_aberto", False)
+    st.session_state.setdefault("cliente_salvando", False)
+    st.session_state.setdefault("cliente_edit_salvando", False)
+    st.session_state.setdefault("cliente_edit_id", None)
+
+    if st.session_state.pop("cliente_sucesso", False):
+        st.success("✅ Cliente cadastrado!")
+
+    if not st.session_state["cliente_form_aberto"]:
+        if st.button("➕ Cadastrar cliente", width="stretch"):
+            st.session_state["cliente_form_aberto"] = True
+            st.rerun()
+
+    if st.session_state["cliente_form_aberto"]:
         with st.form("novo_cliente_form"):
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                nome = st.text_input("Nome do cliente")
-                cpf = st.text_input("CPF")
+                nome = st.text_input("Nome do cliente", key="cliente_novo_nome")
+                cpf = st.text_input("CPF", key="cliente_novo_cpf")
 
             with col2:
-                telefone = st.text_input("Telefone")
-                email = st.text_input("E-mail")
+                telefone = st.text_input("Telefone", key="cliente_novo_telefone")
+                email = st.text_input("E-mail", key="cliente_novo_email")
 
             with col3:
-                ativo = st.checkbox("Ativo", value=True)
+                ativo = st.checkbox("Ativo", value=True, key="cliente_novo_ativo")
 
-            endereco = st.text_area("Endereço")
-            observacoes = st.text_area("Observações")
+            endereco = st.text_area("Endereço", key="cliente_novo_endereco")
+            observacoes = st.text_area("Observações", key="cliente_novo_observacoes")
 
-            submitted = st.form_submit_button("Salvar cliente")
+            col_salvar, col_cancelar = st.columns(2)
+            with col_salvar:
+                submitted = st.form_submit_button("Salvar cliente", disabled=st.session_state["cliente_salvando"])
+            with col_cancelar:
+                cancel = st.form_submit_button("Cancelar")
 
-        if submitted:
+        if cancel:
+            _reset_new_cliente_form()
+            st.session_state["cliente_form_aberto"] = False
+            st.rerun()
+
+        if submitted and not st.session_state["cliente_salvando"]:
             if not nome.strip():
                 st.error("Informe o nome do cliente.")
             else:
-                create_cliente(
-                    conn,
-                    nome,
-                    cpf,
-                    telefone,
-                    endereco,
-                    email,
-                    observacoes,
-                    ativo,
-                )
-                st.success("✅ Cliente cadastrado!")
-                st.rerun()
+                try:
+                    st.session_state["cliente_salvando"] = True
+                    create_cliente(
+                        conn,
+                        nome,
+                        cpf,
+                        telefone,
+                        endereco,
+                        email,
+                        observacoes,
+                        ativo,
+                    )
+                    _reset_new_cliente_form()
+                    st.session_state["cliente_form_aberto"] = False
+                    st.session_state["cliente_sucesso"] = True
+                    st.rerun()
+                finally:
+                    st.session_state["cliente_salvando"] = False
 
     df_clientes = load_clientes(conn)
 
@@ -176,28 +217,31 @@ def render_clientes(conn):
         )
         df_filtrado = df_filtrado[filtro]
 
-    st.dataframe(
-        _clientes_table(df_filtrado),
-        width="stretch",
-        hide_index=True,
-    )
+    for row in df_filtrado.itertuples():
+        col_info, col_action = st.columns([0.8, 0.2])
+        with col_info:
+            st.markdown(f"**{row.nome}**  \n{row.telefone or 'sem telefone'} · {row.cpf or 'sem CPF'}")
+        with col_action:
+            if st.button("Editar", key=f"editar_cliente_{row.id}", width="stretch"):
+                st.session_state["cliente_edit_id"] = int(row.id)
+                st.rerun()
 
     if df_filtrado.empty:
         return
 
+    selected_id = st.session_state.get("cliente_edit_id")
+    if not selected_id:
+        return
+
+    if selected_id not in set(df_filtrado["id"].astype(int)):
+        st.session_state["cliente_edit_id"] = None
+        return
+
     st.divider()
-    st.subheader("✏️ Editar cliente")
-
-    options = {
-        f"{row.nome} | {row.telefone or 'sem telefone'}": row.id
-        for row in df_filtrado.itertuples()
-    }
-
-    selected_label = st.selectbox("Selecione", list(options.keys()))
-    selected_id = options[selected_label]
     selected = df_clientes[df_clientes["id"] == selected_id].iloc[0]
 
     with st.form("editar_cliente_form"):
+        st.subheader(f"✏️ Editar cliente: {selected['nome']}")
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -214,22 +258,38 @@ def render_clientes(conn):
         endereco_edit = st.text_area("Endereço", value=selected["endereco"] or "")
         observacoes_edit = st.text_area("Observações", value=selected["observacoes"] or "")
 
-        salvar = st.form_submit_button("Salvar alterações")
+        col_salvar, col_cancelar = st.columns(2)
+        with col_salvar:
+            salvar = st.form_submit_button(
+                "Salvar alterações",
+                disabled=st.session_state["cliente_edit_salvando"],
+            )
+        with col_cancelar:
+            cancelar_edicao = st.form_submit_button("Cancelar edição")
 
-    if salvar:
+    if cancelar_edicao:
+        st.session_state["cliente_edit_id"] = None
+        st.rerun()
+
+    if salvar and not st.session_state["cliente_edit_salvando"]:
         if not nome_edit.strip():
             st.error("Informe o nome do cliente.")
         else:
-            update_cliente(
-                conn,
-                selected_id,
-                nome_edit,
-                cpf_edit,
-                telefone_edit,
-                endereco_edit,
-                email_edit,
-                observacoes_edit,
-                ativo_edit,
-            )
-            st.success("✅ Cliente atualizado!")
-            st.rerun()
+            try:
+                st.session_state["cliente_edit_salvando"] = True
+                update_cliente(
+                    conn,
+                    selected_id,
+                    nome_edit,
+                    cpf_edit,
+                    telefone_edit,
+                    endereco_edit,
+                    email_edit,
+                    observacoes_edit,
+                    ativo_edit,
+                )
+                st.success("✅ Cliente atualizado!")
+                st.session_state["cliente_edit_id"] = None
+                st.rerun()
+            finally:
+                st.session_state["cliente_edit_salvando"] = False

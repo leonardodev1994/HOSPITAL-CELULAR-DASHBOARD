@@ -815,6 +815,7 @@ def _update_ordem(conn, os_id, data):
 
 def _render_nova_os(conn):
     df_clientes = load_clientes(conn, somente_ativos=True)
+    st.session_state.setdefault("nova_os_salvando", False)
 
     with st.expander("➕ Nova Ordem de Serviço", expanded=False):
         col1, col2, col3 = st.columns(3)
@@ -886,43 +887,50 @@ def _render_nova_os(conn):
         servico = st.text_area("Serviço Realizado")
         observacoes = st.text_area("Observações")
 
-        if st.button("Salvar Ordem de Serviço", width="stretch"):
+        if st.button("Salvar Ordem de Serviço", width="stretch", disabled=st.session_state["nova_os_salvando"]):
+            if st.session_state["nova_os_salvando"]:
+                return
+
             if not cliente.strip():
                 st.error("Informe o nome do cliente para salvar a OS.")
                 return
 
-            if cliente_id is None and salvar_cliente:
-                cliente_id = create_cliente(conn, cliente, cpf, telefone, endereco)
+            try:
+                st.session_state["nova_os_salvando"] = True
+                if cliente_id is None and salvar_cliente:
+                    cliente_id = create_cliente(conn, cliente, cpf, telefone, endereco)
 
-            os_id = _create_ordem(conn, (
-                str(data_os),
-                cliente_id,
-                atendente,
-                loja,
-                cliente,
-                cpf,
-                telefone,
-                endereco,
-                marca,
-                modelo,
-                imei,
-                senha,
-                defeito,
-                servico,
-                valor,
-                garantia,
-                status,
-                observacoes,
-                _json_dump({}),
-                _json_dump({}),
-                _json_dump({}),
-                _json_dump({}),
-                "",
-                "",
-                current_quiosque_id(),
-            ))
-            st.success(f"✅ OS #{str(os_id).zfill(5)} salva!")
-            st.rerun()
+                os_id = _create_ordem(conn, (
+                    str(data_os),
+                    cliente_id,
+                    atendente,
+                    loja,
+                    cliente,
+                    cpf,
+                    telefone,
+                    endereco,
+                    marca,
+                    modelo,
+                    imei,
+                    senha,
+                    defeito,
+                    servico,
+                    valor,
+                    garantia,
+                    status,
+                    observacoes,
+                    _json_dump({}),
+                    _json_dump({}),
+                    _json_dump({}),
+                    _json_dump({}),
+                    "",
+                    "",
+                    current_quiosque_id(),
+                ))
+                st.success(f"✅ OS #{str(os_id).zfill(5)} salva!")
+                st.rerun()
+            finally:
+                st.session_state["nova_os_salvando"] = False
 
 
 def _render_edit_form(conn, os_id):
@@ -932,6 +940,8 @@ def _render_edit_form(conn, os_id):
         st.warning("OS não encontrada.")
         return
     can_edit_values = has_permission("edit_financial_values")
+    saving_key = f"os_edit_salvando_{os_id}"
+    st.session_state.setdefault(saving_key, False)
 
     entrada = _json_load(os_data.get("checklist_entrada"))
     reparo = _json_load(os_data.get("checklist_reparo"))
@@ -1067,52 +1077,64 @@ def _render_edit_form(conn, os_id):
             st.caption("Comprovante recomendado para Pix ou cartão.")
             pagamento["foto_comprovante"] = _render_upload("Foto do comprovante", pagamento, os_id, "foto_comprovante", "pagamento")
 
-    if st.button("Salvar edição da OS", key=f"salvar_edicao_{os_id}", width="stretch"):
+    if st.button(
+        "Salvar edição da OS",
+        key=f"salvar_edicao_{os_id}",
+        width="stretch",
+        disabled=st.session_state[saving_key],
+    ):
+        if st.session_state[saving_key]:
+            return
+
         if not cliente.strip():
             st.error("Informe o nome do cliente.")
             return
 
-        assinatura_entrada = _signature_value_after_save(
-            assinatura_entrada_canvas,
-            os_id,
-            "assinatura_entrada",
-            assinatura_entrada_atual,
-        )
-        assinatura_saida = _signature_value_after_save(
-            assinatura_saida_canvas,
-            os_id,
-            "assinatura_saida",
-            assinatura_saida_atual,
-        )
+        try:
+            st.session_state[saving_key] = True
+            assinatura_entrada = _signature_value_after_save(
+                assinatura_entrada_canvas,
+                os_id,
+                "assinatura_entrada",
+                assinatura_entrada_atual,
+            )
+            assinatura_saida = _signature_value_after_save(
+                assinatura_saida_canvas,
+                os_id,
+                "assinatura_saida",
+                assinatura_saida_atual,
+            )
 
-        _update_ordem(conn, os_id, (
-            str(data_os),
-            st.session_state.get(f"edit_cliente_id_{os_id}"),
-            cliente,
-            cpf,
-            telefone,
-            endereco,
-            atendente,
-            loja,
-            marca,
-            modelo,
-            imei,
-            senha,
-            defeito,
-            servico,
-            valor,
-            garantia,
-            status,
-            observacoes,
-            _json_dump(entrada),
-            _json_dump(reparo),
-            _json_dump(saida),
-            _json_dump(pagamento),
-            assinatura_entrada,
-            assinatura_saida,
-        ))
-        st.success("✅ OS atualizada!")
-        st.rerun()
+            _update_ordem(conn, os_id, (
+                str(data_os),
+                st.session_state.get(f"edit_cliente_id_{os_id}"),
+                cliente,
+                cpf,
+                telefone,
+                endereco,
+                atendente,
+                loja,
+                marca,
+                modelo,
+                imei,
+                senha,
+                defeito,
+                servico,
+                valor,
+                garantia,
+                status,
+                observacoes,
+                _json_dump(entrada),
+                _json_dump(reparo),
+                _json_dump(saida),
+                _json_dump(pagamento),
+                assinatura_entrada,
+                assinatura_saida,
+            ))
+            st.success("✅ OS atualizada!")
+            st.rerun()
+        finally:
+            st.session_state[saving_key] = False
 
 
 def _render_lista_ordens(conn):
