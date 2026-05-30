@@ -32,7 +32,6 @@ st.set_page_config(
 apply_style()
 
 
-@st.cache_resource(show_spinner=False)
 def ensure_database_initialized():
     migration_conn = init_db()
     try:

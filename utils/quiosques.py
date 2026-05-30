@@ -13,7 +13,13 @@ def load_quiosques(conn, active_only=True):
         query += " WHERE ativo = ?"
         params = (1,)
     query += " ORDER BY id"
-    return pd.read_sql_query(query, conn, params=params)
+    try:
+        return pd.read_sql_query(query, conn, params=params)
+    except Exception:
+        from database.database import ensure_quiosques_schema
+
+        ensure_quiosques_schema(conn)
+        return pd.read_sql_query(query, conn, params=params)
 
 
 def user_can_view_all(user=None):

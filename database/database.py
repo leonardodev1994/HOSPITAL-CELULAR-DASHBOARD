@@ -193,6 +193,14 @@ def _migration_0003_renomeia_quiosques(conn):
     _rename_quiosque_users(conn)
 
 
+def ensure_quiosques_schema(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_quiosque_schema(conn)
+    else:
+        _create_sqlite_quiosque_schema(conn)
+    conn.commit()
+
+
 def _create_sqlite_schema(conn):
     cursor = conn.cursor()
 
