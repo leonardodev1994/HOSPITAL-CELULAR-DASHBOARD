@@ -8,9 +8,11 @@ from utils.audit import log_action
 from utils.auth import current_user
 from utils.dashboard_ui import moeda
 from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
+from utils.quiosques import current_quiosque_id, scope_clause
 
 
 def _load_lancamentos(conn):
+    scope, params = scope_clause()
     return pd.read_sql_query("""
     SELECT
         id,
@@ -21,14 +23,17 @@ def _load_lancamentos(conn):
         produto_id,
         quantidade,
         venda_id,
-        venda_item_id
+        venda_item_id,
+        quiosque_id
     FROM lancamentos
+    """ + scope + """
     ORDER BY data DESC, id DESC
-    """, conn)
+    """, conn, params=params)
 
 
 def _delete_lancamento(conn, lancamento, user=None):
     cursor = conn.cursor()
+    scope, params = scope_clause(prefix="AND")
     produto_id = lancamento.get("produto_id")
     quantidade = lancamento.get("quantidade")
 
@@ -41,8 +46,14 @@ def _delete_lancamento(conn, lancamento, user=None):
             motivo="Venda removida",
         )
 
-    cursor.execute("DELETE FROM pagamentos WHERE lancamento_id = ?", (int(lancamento["id"]),))
-    cursor.execute("DELETE FROM lancamentos WHERE id = ?", (int(lancamento["id"]),))
+    cursor.execute(
+        "DELETE FROM pagamentos WHERE lancamento_id = ?" + scope,
+        (int(lancamento["id"]),) + params,
+    )
+    cursor.execute(
+        "DELETE FROM lancamentos WHERE id = ?" + scope,
+        (int(lancamento["id"]),) + params,
+    )
     conn.commit()
     log_action(
         conn,
@@ -150,20 +161,21 @@ def _save_cart(conn, data, items, pagamentos, user=None):
     lancamento_ids = []
 
     venda_id = execute_insert_returning_id(conn, cursor, """
-    INSERT INTO vendas (data, total, status, usuario_id, usuario_nome)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO vendas (data, total, status, usuario_id, usuario_nome, quiosque_id)
+    VALUES (?, ?, ?, ?, ?, ?)
     """, (
         str(data),
         total,
         "Ativa",
         None if not user else user.get("id"),
         None if not user else user.get("nome"),
+        current_quiosque_id(user),
     ))
 
     for item in items:
         lancamento_id = execute_insert_returning_id(conn, cursor, """
-        INSERT INTO lancamentos (data, tipo, descricao, valor, produto_id, quantidade, venda_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO lancamentos (data, tipo, descricao, valor, produto_id, quantidade, venda_id, quiosque_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             str(data),
             item["tipo"],
@@ -172,6 +184,7 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             item.get("produto_id"),
             item["quantidade"] if item["tipo"] == "Produto" else None,
             venda_id,
+            current_quiosque_id(user),
         ))
         lancamento_ids.append(lancamento_id)
 
@@ -184,9 +197,10 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             produto_id,
             quantidade,
             valor_unitario,
-            valor_total
+            valor_total,
+            quiosque_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             venda_id,
             lancamento_id,
@@ -196,11 +210,12 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             item["quantidade"],
             item["valor_unitario"],
             _item_total(item),
+            current_quiosque_id(user),
         ))
 
         cursor.execute(
-            "UPDATE lancamentos SET venda_item_id = ? WHERE id = ?",
-            (venda_item_id, lancamento_id),
+            "UPDATE lancamentos SET venda_item_id = ? WHERE id = ? AND quiosque_id = ?",
+            (venda_item_id, lancamento_id, current_quiosque_id(user)),
         )
         conn.commit()
 
@@ -212,9 +227,9 @@ def _save_cart(conn, data, items, pagamentos, user=None):
         for lancamento_id, parcela in zip(lancamento_ids, parcelas):
             if parcela > 0:
                 cursor.execute("""
-                INSERT INTO pagamentos (lancamento_id, forma_pagamento, valor)
-                VALUES (?, ?, ?)
-                """, (lancamento_id, forma, parcela))
+                INSERT INTO pagamentos (lancamento_id, forma_pagamento, valor, quiosque_id)
+                VALUES (?, ?, ?, ?)
+                """, (lancamento_id, forma, parcela, current_quiosque_id(user)))
 
     conn.commit()
     log_action(

@@ -10,6 +10,7 @@ from streamlit_drawable_canvas import st_canvas
 from database.database import execute_insert_returning_id
 from utils.dashboard_ui import page_header
 from utils.pdf_os import generate_os_pdf
+from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
 from views.clientes import create_cliente, load_clientes
 
 
@@ -212,6 +213,7 @@ def _render_cliente_search(df_clientes, key_prefix, on_select, selected_id=None)
 
 
 def _load_ordens_servico(conn):
+    scope, params = scope_clause()
     return pd.read_sql_query("""
     SELECT
         id,
@@ -223,10 +225,12 @@ def _load_ordens_servico(conn):
         servico,
         valor,
         garantia,
-        status
+        status,
+        quiosque_id
     FROM ordens_servico
+    """ + scope + """
     ORDER BY id DESC
-    """, conn)
+    """, conn, params=params)
 
 
 def _load_ordens_por_cliente(conn, cliente):
@@ -235,6 +239,7 @@ def _load_ordens_por_cliente(conn, cliente):
     cpf = getattr(cliente, "cpf", "") or ""
     telefone = getattr(cliente, "telefone", "") or ""
 
+    scope, params = scope_clause(prefix="AND")
     return pd.read_sql_query("""
     SELECT
         id,
@@ -249,12 +254,13 @@ def _load_ordens_por_cliente(conn, cliente):
         garantia,
         status
     FROM ordens_servico
-    WHERE cliente_id = ?
+    WHERE (cliente_id = ?
        OR cpf = ?
        OR telefone = ?
-       OR cliente LIKE ?
+       OR cliente LIKE ?)
+    """ + scope + """
     ORDER BY id DESC
-    """, conn, params=(cliente_id, cpf, telefone, f"%{nome}%"))
+    """, conn, params=(cliente_id, cpf, telefone, f"%{nome}%") + params)
 
 
 def _search_ordens_texto(conn, termo, limit=10):
@@ -267,6 +273,7 @@ def _search_ordens_texto(conn, termo, limit=10):
         return pd.DataFrame()
 
     if termo_digits:
+        scope, params = scope_clause(prefix="AND")
         return pd.read_sql_query("""
         SELECT
             id,
@@ -281,13 +288,15 @@ def _search_ordens_texto(conn, termo, limit=10):
             garantia,
             status
         FROM ordens_servico
-        WHERE cliente LIKE ?
+        WHERE (cliente LIKE ?
            OR cpf LIKE ?
-           OR telefone LIKE ?
+           OR telefone LIKE ?)
+        """ + scope + """
         ORDER BY id DESC
         LIMIT ?
-        """, conn, params=(like_term, digit_like, digit_like, limit))
+        """, conn, params=(like_term, digit_like, digit_like) + params + (limit,))
 
+    scope, params = scope_clause(prefix="AND")
     return pd.read_sql_query("""
     SELECT
         id,
@@ -303,18 +312,21 @@ def _search_ordens_texto(conn, termo, limit=10):
         status
     FROM ordens_servico
     WHERE cliente LIKE ?
+    """ + scope + """
     ORDER BY id DESC
     LIMIT ?
-    """, conn, params=(like_term, limit))
+    """, conn, params=(like_term,) + params + (limit,))
 
 
 def _load_ordem_detalhe(conn, os_id):
+    scope, params = scope_clause(prefix="AND")
     df = pd.read_sql_query("""
     SELECT *
     FROM ordens_servico
     WHERE id = ?
+    """ + scope + """
     LIMIT 1
-    """, conn, params=(os_id,))
+    """, conn, params=(os_id,) + params)
 
     if df.empty:
         return None
@@ -758,14 +770,16 @@ def _create_ordem(conn, data):
         checklist_saida,
         pagamento_os,
         assinatura_entrada,
-        assinatura_saida
+        assinatura_saida,
+        quiosque_id
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, data)
 
 
 def _update_ordem(conn, os_id, data):
     cursor = conn.cursor()
+    scope, params = scope_clause(prefix="AND")
     cursor.execute("""
     UPDATE ordens_servico
     SET
@@ -794,7 +808,7 @@ def _update_ordem(conn, os_id, data):
         assinatura_entrada = ?,
         assinatura_saida = ?
     WHERE id = ?
-    """, (*data, os_id))
+    """ + scope, (*data, os_id) + params)
     conn.commit()
 
 
@@ -904,6 +918,7 @@ def _render_nova_os(conn):
                 _json_dump({}),
                 "",
                 "",
+                current_quiosque_id(),
             ))
             st.success(f"✅ OS #{str(os_id).zfill(5)} salva!")
             st.rerun()

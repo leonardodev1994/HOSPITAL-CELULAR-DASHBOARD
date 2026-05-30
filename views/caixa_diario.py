@@ -4,15 +4,17 @@ import pandas as pd
 import streamlit as st
 
 from utils.dashboard_ui import pie_chart
+from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
 
 
 def _pagamentos_do_dia(conn, data):
+    scope, _ = scope_clause("lancamentos", prefix="AND")
     return pd.read_sql_query("""
     SELECT pagamentos.*
     FROM pagamentos
     INNER JOIN lancamentos ON lancamentos.id = pagamentos.lancamento_id
     WHERE lancamentos.data = ?
-    """, conn, params=(data,))
+    """ + scope, conn, params=scoped_params(data))
 
 
 def render_caixa_diario(conn):
@@ -26,23 +28,25 @@ def render_caixa_diario(conn):
     if st.button("Abrir Caixa"):
         caixa_existente = cursor.execute("""
         SELECT * FROM caixa
-        WHERE data = ?
-        """, (hoje,)).fetchone()
+        WHERE data = ? AND quiosque_id = ?
+        """, (hoje, current_quiosque_id())).fetchone()
 
         if caixa_existente:
             st.warning("⚠️ Caixa já aberto hoje.")
         else:
             cursor.execute("""
-            INSERT INTO caixa (data, valor_inicial)
-            VALUES (?, ?)
-            """, (hoje, valor_inicial))
+            INSERT INTO caixa (data, valor_inicial, quiosque_id)
+            VALUES (?, ?, ?)
+            """, (hoje, valor_inicial, current_quiosque_id()))
 
             conn.commit()
             st.success("✅ Caixa aberto!")
 
     df_pagamentos = _pagamentos_do_dia(conn, hoje)
-    df_despesas = pd.read_sql_query("SELECT * FROM despesas", conn)
-    df_caixa = pd.read_sql_query("SELECT * FROM caixa", conn)
+    where_despesas, params_despesas = scope_clause()
+    where_caixa, params_caixa = scope_clause()
+    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    df_caixa = pd.read_sql_query(f"SELECT * FROM caixa{where_caixa}", conn, params=params_caixa)
 
     despesas_hoje = df_despesas[df_despesas["data"] == hoje]
     caixa_hoje = df_caixa[df_caixa["data"] == hoje]

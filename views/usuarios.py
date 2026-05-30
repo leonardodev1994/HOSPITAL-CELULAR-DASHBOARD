@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.auth import current_user, hash_password
+from utils.quiosques import load_quiosques
 
 
 PERFIS = ["Admin", "Atendente", "Técnico"]
@@ -15,13 +16,17 @@ def _load_users(conn):
         usuario,
         perfil,
         ativo,
-        criado_em
+        criado_em,
+        usuarios.quiosque_id,
+        usuarios.acesso_todos_quiosques,
+        quiosques.nome AS quiosque_nome
     FROM usuarios
+    LEFT JOIN quiosques ON quiosques.id = usuarios.quiosque_id
     ORDER BY ativo DESC, nome
     """, conn)
 
 
-def _create_user(conn, nome, usuario, senha, perfil, ativo):
+def _create_user(conn, nome, usuario, senha, perfil, ativo, quiosque_id, acesso_todos_quiosques):
     cursor = conn.cursor()
     salt, password_hash = hash_password(senha)
 
@@ -32,9 +37,11 @@ def _create_user(conn, nome, usuario, senha, perfil, ativo):
         senha_hash,
         senha_salt,
         perfil,
-        ativo
+        ativo,
+        quiosque_id,
+        acesso_todos_quiosques
     )
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         nome.strip(),
         usuario.strip(),
@@ -42,20 +49,24 @@ def _create_user(conn, nome, usuario, senha, perfil, ativo):
         salt,
         perfil,
         1 if ativo else 0,
+        quiosque_id,
+        1 if acesso_todos_quiosques else 0,
     ))
     conn.commit()
 
 
-def _update_user(conn, user_id, nome, perfil, ativo):
+def _update_user(conn, user_id, nome, perfil, ativo, quiosque_id, acesso_todos_quiosques):
     cursor = conn.cursor()
     cursor.execute("""
     UPDATE usuarios
-    SET nome = ?, perfil = ?, ativo = ?
+    SET nome = ?, perfil = ?, ativo = ?, quiosque_id = ?, acesso_todos_quiosques = ?
     WHERE id = ?
     """, (
         nome.strip(),
         perfil,
         1 if ativo else 0,
+        quiosque_id,
+        1 if acesso_todos_quiosques else 0,
         user_id,
     ))
     conn.commit()
@@ -80,6 +91,8 @@ def render_usuarios(conn):
         return
 
     st.subheader("👥 Usuários e Funcionários")
+    df_quiosques = load_quiosques(conn)
+    quiosque_options = {int(row.id): row.nome for row in df_quiosques.itertuples()}
 
     with st.expander("➕ Cadastrar novo usuário", expanded=False):
         with st.form("novo_usuario_form"):
@@ -93,6 +106,12 @@ def render_usuarios(conn):
                 senha = st.text_input("Senha", type="password")
                 perfil = st.selectbox("Perfil", PERFIS, index=1)
                 ativo = st.checkbox("Ativo", value=True)
+                acesso_todos = st.checkbox("Acesso a todos os quiosques", value=perfil == "Admin")
+                quiosque_id = st.selectbox(
+                    "Quiosque",
+                    list(quiosque_options.keys()),
+                    format_func=lambda value: quiosque_options[value],
+                )
 
             submitted = st.form_submit_button("Salvar usuário")
 
@@ -103,7 +122,7 @@ def render_usuarios(conn):
                 st.error("A senha deve ter pelo menos 6 caracteres.")
             else:
                 try:
-                    _create_user(conn, nome, usuario, senha, perfil, ativo)
+                    _create_user(conn, nome, usuario, senha, perfil, ativo, quiosque_id, acesso_todos)
                     st.success("✅ Usuário cadastrado!")
                     st.rerun()
                 except Exception as error:
@@ -125,9 +144,11 @@ def render_usuarios(conn):
         "nome": "Nome",
         "usuario": "Usuário",
         "perfil": "Perfil",
+        "quiosque_nome": "Quiosque",
         "criado_em": "Criado em",
     })
-    tabela = tabela[["ID", "Nome", "Usuário", "Perfil", "Status", "Criado em"]]
+    tabela["Acesso"] = tabela["acesso_todos_quiosques"].map({1: "Todos", 0: "Quiosque"})
+    tabela = tabela[["ID", "Nome", "Usuário", "Perfil", "Quiosque", "Acesso", "Status", "Criado em"]]
 
     st.dataframe(
         tabela,
@@ -164,11 +185,21 @@ def render_usuarios(conn):
 
         with col3:
             ativo_edit = st.checkbox("Ativo", value=bool(selected_user["ativo"]))
+            acesso_todos_edit = st.checkbox("Acesso a todos", value=bool(selected_user["acesso_todos_quiosques"]))
+            selected_quiosque = int(selected_user["quiosque_id"] or 1)
+            quiosque_edit = st.selectbox(
+                "Quiosque",
+                list(quiosque_options.keys()),
+                format_func=lambda value: quiosque_options[value],
+                index=list(quiosque_options.keys()).index(selected_quiosque)
+                if selected_quiosque in quiosque_options
+                else 0,
+            )
 
         salvar_edicao = st.form_submit_button("Salvar alterações")
 
     if salvar_edicao:
-        _update_user(conn, selected_id, nome_edit, perfil_edit, ativo_edit)
+        _update_user(conn, selected_id, nome_edit, perfil_edit, ativo_edit, quiosque_edit, acesso_todos_edit)
         st.success("✅ Usuário atualizado!")
         st.rerun()
 

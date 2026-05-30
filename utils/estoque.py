@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 
 from database.database import execute_insert_returning_id
+from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
 
 
 PLANILHA_PADRAO = "/Users/macdeleonardo/Downloads/Controle_Estoque_Peixinho_2.xlsx"
@@ -88,7 +89,8 @@ def import_inventory_from_excel(conn, path=PLANILHA_PADRAO):
         SELECT id
         FROM estoque
         WHERE produto = ? AND COALESCE(modelo, '') = COALESCE(?, '')
-        """, (row["produto"], row["modelo"])).fetchone()
+          AND quiosque_id = ?
+        """, (row["produto"], row["modelo"], current_quiosque_id())).fetchone()
 
         if existing:
             cursor.execute("""
@@ -100,7 +102,7 @@ def import_inventory_from_excel(conn, path=PLANILHA_PADRAO):
                 observacao = ?,
                 ativo = 1,
                 atualizado_em = CURRENT_TIMESTAMP
-            WHERE id = ?
+            WHERE id = ? AND quiosque_id = ?
             """, (
                 row["categoria"],
                 row["quantidade"],
@@ -108,6 +110,7 @@ def import_inventory_from_excel(conn, path=PLANILHA_PADRAO):
                 row["estoque_minimo"],
                 row["observacao"],
                 existing[0],
+                current_quiosque_id(),
             ))
             updated += 1
         else:
@@ -119,9 +122,10 @@ def import_inventory_from_excel(conn, path=PLANILHA_PADRAO):
                 quantidade,
                 valor_venda,
                 estoque_minimo,
-                observacao
+                observacao,
+                quiosque_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 row["produto"],
                 row["modelo"],
@@ -130,6 +134,7 @@ def import_inventory_from_excel(conn, path=PLANILHA_PADRAO):
                 row["valor_venda"],
                 row["estoque_minimo"],
                 row["observacao"],
+                current_quiosque_id(),
             ))
             imported += 1
 
@@ -163,7 +168,8 @@ def add_stock_product(
     SELECT id, quantidade
     FROM estoque
     WHERE produto = ? AND COALESCE(modelo, '') = COALESCE(?, '')
-    """, (produto, modelo)).fetchone()
+      AND quiosque_id = ?
+    """, (produto, modelo, current_quiosque_id())).fetchone()
 
     if existing:
         produto_id = existing[0]
@@ -177,7 +183,7 @@ def add_stock_product(
             observacao = ?,
             ativo = 1,
             atualizado_em = CURRENT_TIMESTAMP
-        WHERE id = ?
+        WHERE id = ? AND quiosque_id = ?
         """, (
             categoria,
             nova_quantidade,
@@ -185,6 +191,7 @@ def add_stock_product(
             estoque_minimo,
             observacao,
             produto_id,
+            current_quiosque_id(),
         ))
         conn.commit()
     else:
@@ -196,9 +203,10 @@ def add_stock_product(
             quantidade,
             valor_venda,
             estoque_minimo,
-            observacao
+            observacao,
+            quiosque_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             produto,
             modelo,
@@ -207,6 +215,7 @@ def add_stock_product(
             valor_venda,
             estoque_minimo,
             observacao,
+            current_quiosque_id(),
         ))
 
     if quantidade > 0:
@@ -222,14 +231,20 @@ def add_stock_product(
 
 
 def load_stock(conn, only_active=True):
+    scope, params = scope_clause()
     query = "SELECT * FROM estoque"
     if only_active:
         query += " WHERE ativo = 1"
+        if scope:
+            query += scope.replace(" WHERE ", " AND ")
+    else:
+        query += scope
     query += " ORDER BY categoria, produto, modelo"
-    return pd.read_sql_query(query, conn)
+    return pd.read_sql_query(query, conn, params=params)
 
 
 def load_stock_movements(conn, limit=50):
+    scope, params = scope_clause("m", prefix="WHERE")
     return pd.read_sql_query("""
     SELECT
         m.data,
@@ -243,9 +258,10 @@ def load_stock_movements(conn, limit=50):
         m.responsavel
     FROM estoque_movimentacoes m
     LEFT JOIN estoque e ON e.id = m.produto_id
+    """ + scope + """
     ORDER BY m.id DESC
     LIMIT ?
-    """, conn, params=(limit,))
+    """, conn, params=params + (limit,))
 
 
 def register_stock_movement(conn, produto_id, tipo, quantidade, motivo, lancamento_id=None, responsavel="Sistema"):
@@ -258,9 +274,10 @@ def register_stock_movement(conn, produto_id, tipo, quantidade, motivo, lancamen
         quantidade,
         motivo,
         lancamento_id,
-        responsavel
+        responsavel,
+        quiosque_id
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         produto_id,
         datetime.today().strftime("%Y-%m-%d"),
@@ -269,13 +286,17 @@ def register_stock_movement(conn, produto_id, tipo, quantidade, motivo, lancamen
         motivo,
         lancamento_id,
         responsavel,
+        current_quiosque_id(),
     ))
     conn.commit()
 
 
 def reduce_stock(conn, produto_id, quantidade, lancamento_id=None):
     cursor = conn.cursor()
-    produto = cursor.execute("SELECT quantidade FROM estoque WHERE id = ?", (produto_id,)).fetchone()
+    produto = cursor.execute(
+        "SELECT quantidade FROM estoque WHERE id = ? AND quiosque_id = ?",
+        (produto_id, current_quiosque_id()),
+    ).fetchone()
 
     if not produto:
         raise ValueError("Produto não encontrado no estoque.")
@@ -289,8 +310,8 @@ def reduce_stock(conn, produto_id, quantidade, lancamento_id=None):
     cursor.execute("""
     UPDATE estoque
     SET quantidade = ?, atualizado_em = CURRENT_TIMESTAMP
-    WHERE id = ?
-    """, (nova_quantidade, produto_id))
+    WHERE id = ? AND quiosque_id = ?
+    """, (nova_quantidade, produto_id, current_quiosque_id()))
     conn.commit()
 
     register_stock_movement(
@@ -308,7 +329,10 @@ def restore_stock(conn, produto_id, quantidade, lancamento_id=None, motivo="Vend
         return
 
     cursor = conn.cursor()
-    produto = cursor.execute("SELECT quantidade FROM estoque WHERE id = ?", (produto_id,)).fetchone()
+    produto = cursor.execute(
+        "SELECT quantidade FROM estoque WHERE id = ? AND quiosque_id = ?",
+        (produto_id, current_quiosque_id()),
+    ).fetchone()
 
     if not produto:
         return
@@ -317,8 +341,8 @@ def restore_stock(conn, produto_id, quantidade, lancamento_id=None, motivo="Vend
     cursor.execute("""
     UPDATE estoque
     SET quantidade = ?, atualizado_em = CURRENT_TIMESTAMP
-    WHERE id = ?
-    """, (nova_quantidade, produto_id))
+    WHERE id = ? AND quiosque_id = ?
+    """, (nova_quantidade, produto_id, current_quiosque_id()))
     conn.commit()
 
     register_stock_movement(
@@ -333,7 +357,10 @@ def restore_stock(conn, produto_id, quantidade, lancamento_id=None, motivo="Vend
 
 def adjust_stock(conn, produto_id, quantidade, valor_venda, estoque_minimo, observacao):
     cursor = conn.cursor()
-    atual = cursor.execute("SELECT quantidade FROM estoque WHERE id = ?", (produto_id,)).fetchone()
+    atual = cursor.execute(
+        "SELECT quantidade FROM estoque WHERE id = ? AND quiosque_id = ?",
+        (produto_id, current_quiosque_id()),
+    ).fetchone()
     quantidade_anterior = float(atual[0] or 0) if atual else 0
     diferenca = float(quantidade) - quantidade_anterior
 
@@ -344,8 +371,8 @@ def adjust_stock(conn, produto_id, quantidade, valor_venda, estoque_minimo, obse
         estoque_minimo = ?,
         observacao = ?,
         atualizado_em = CURRENT_TIMESTAMP
-    WHERE id = ?
-    """, (quantidade, valor_venda, estoque_minimo, observacao, produto_id))
+    WHERE id = ? AND quiosque_id = ?
+    """, (quantidade, valor_venda, estoque_minimo, observacao, produto_id, current_quiosque_id()))
     conn.commit()
 
     if diferenca != 0:

@@ -44,15 +44,19 @@ def ensure_default_admin(conn):
         senha_hash,
         senha_salt,
         perfil,
-        ativo
+        ativo,
+        quiosque_id,
+        acesso_todos_quiosques
     )
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         "Administrador",
         DEFAULT_ADMIN_USER,
         password_hash,
         salt,
         "Admin",
+        1,
+        1,
         1,
     ))
     conn.commit()
@@ -86,6 +90,8 @@ def authenticate_user(conn, username, password):
         "nome": user["nome"],
         "usuario": user["usuario"],
         "perfil": user["perfil"],
+        "quiosque_id": int(user.get("quiosque_id") or 1),
+        "acesso_todos_quiosques": int(user.get("acesso_todos_quiosques") or 0),
     }
 
 

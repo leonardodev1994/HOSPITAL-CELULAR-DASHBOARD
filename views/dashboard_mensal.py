@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.dashboard_ui import bar_chart, empty_state, metric_card, moeda, page_header, pie_chart
+from utils.quiosques import scope_clause
 
 
 def _date_bounds(df):
@@ -35,8 +36,10 @@ def _period_label(start, end):
 
 
 def render_dashboard_mensal(conn):
-    df = pd.read_sql_query("SELECT * FROM lancamentos", conn)
-    df_despesas = pd.read_sql_query("SELECT * FROM despesas", conn)
+    where_lancamentos, params_lancamentos = scope_clause()
+    where_despesas, params_despesas = scope_clause()
+    df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
+    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
 
     min_date, max_date = _date_bounds(df)
 

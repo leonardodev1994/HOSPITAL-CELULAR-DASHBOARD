@@ -99,6 +99,22 @@ def connect_postgres(database_url):
 
 MIGRATIONS = [
     ("0001_initial_schema", "_migration_0001_initial_schema"),
+    ("0002_quiosques", "_migration_0002_quiosques"),
+]
+
+
+SCOPED_TABLES = [
+    "lancamentos",
+    "pagamentos",
+    "vendas",
+    "venda_itens",
+    "auditoria",
+    "estoque",
+    "estoque_movimentacoes",
+    "despesas",
+    "caixa",
+    "ordens_servico",
+    "clientes",
 ]
 
 
@@ -152,6 +168,14 @@ def _migration_0001_initial_schema(conn):
         return
 
     _create_sqlite_schema(conn)
+
+
+def _migration_0002_quiosques(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_quiosque_schema(conn)
+        return
+
+    _create_sqlite_quiosque_schema(conn)
 
 
 def _create_sqlite_schema(conn):
@@ -520,6 +544,101 @@ def _create_postgres_schema(conn):
     _add_postgres_column_if_missing(cursor, "lancamentos", "quantidade", "DOUBLE PRECISION")
     _add_postgres_column_if_missing(cursor, "lancamentos", "venda_id", "INTEGER")
     _add_postgres_column_if_missing(cursor, "lancamentos", "venda_item_id", "INTEGER")
+
+
+def _create_sqlite_quiosque_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS quiosques (
+        id INTEGER PRIMARY KEY,
+        nome TEXT NOT NULL UNIQUE,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    _seed_quiosques(cursor)
+
+    for table in SCOPED_TABLES:
+        _add_column_if_missing(cursor, table, "quiosque_id", "INTEGER")
+        cursor.execute(f"UPDATE {table} SET quiosque_id = 1 WHERE quiosque_id IS NULL")
+
+    _add_column_if_missing(cursor, "usuarios", "quiosque_id", "INTEGER")
+    _add_column_if_missing(cursor, "usuarios", "acesso_todos_quiosques", "INTEGER NOT NULL DEFAULT 0")
+    cursor.execute("UPDATE usuarios SET quiosque_id = 1 WHERE quiosque_id IS NULL")
+    cursor.execute("UPDATE usuarios SET acesso_todos_quiosques = 1 WHERE perfil = 'Admin'")
+    _seed_quiosque_users(conn)
+
+
+def _create_postgres_quiosque_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS quiosques (
+        id INTEGER PRIMARY KEY,
+        nome TEXT NOT NULL UNIQUE,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    _seed_quiosques(cursor)
+
+    for table in SCOPED_TABLES:
+        _add_postgres_column_if_missing(cursor, table, "quiosque_id", "INTEGER")
+        cursor.execute(f"UPDATE {table} SET quiosque_id = 1 WHERE quiosque_id IS NULL")
+        cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_quiosque_id ON {table}(quiosque_id)")
+
+    _add_postgres_column_if_missing(cursor, "usuarios", "quiosque_id", "INTEGER")
+    _add_postgres_column_if_missing(cursor, "usuarios", "acesso_todos_quiosques", "INTEGER NOT NULL DEFAULT 0")
+    cursor.execute("UPDATE usuarios SET quiosque_id = 1 WHERE quiosque_id IS NULL")
+    cursor.execute("UPDATE usuarios SET acesso_todos_quiosques = 1 WHERE perfil = 'Admin'")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_quiosque_id ON usuarios(quiosque_id)")
+    _seed_quiosque_users(conn)
+
+
+def _seed_quiosques(cursor):
+    for quiosque_id in range(1, 5):
+        cursor.execute(
+            "INSERT INTO quiosques (id, nome, ativo) VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING",
+            (quiosque_id, f"Quiosque {quiosque_id}", 1),
+        )
+
+
+def _seed_quiosque_users(conn):
+    from utils.auth import hash_password
+
+    cursor = conn.cursor()
+    for quiosque_id in range(1, 5):
+        usuario = f"quiosque{quiosque_id}"
+        exists = cursor.execute(
+            "SELECT id FROM usuarios WHERE usuario = ? LIMIT 1",
+            (usuario,),
+        ).fetchone()
+        if exists:
+            continue
+
+        salt, password_hash = hash_password(f"quiosque{quiosque_id}")
+        cursor.execute("""
+        INSERT INTO usuarios (
+            nome,
+            usuario,
+            senha_hash,
+            senha_salt,
+            perfil,
+            ativo,
+            quiosque_id,
+            acesso_todos_quiosques
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            f"Quiosque {quiosque_id}",
+            usuario,
+            password_hash,
+            salt,
+            "Atendente",
+            1,
+            quiosque_id,
+            0,
+        ))
 
 
 def execute_insert_returning_id(conn, cursor, query, params):

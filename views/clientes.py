@@ -2,9 +2,11 @@ import pandas as pd
 import streamlit as st
 
 from database.database import execute_insert_returning_id
+from utils.quiosques import current_quiosque_id, scope_clause
 
 
 def load_clientes(conn, somente_ativos=False):
+    scope, params = scope_clause()
     query = """
     SELECT
         id,
@@ -15,16 +17,21 @@ def load_clientes(conn, somente_ativos=False):
         email,
         observacoes,
         ativo,
-        criado_em
+        criado_em,
+        quiosque_id
     FROM clientes
     """
 
     if somente_ativos:
         query += " WHERE ativo = 1"
+        if scope:
+            query += scope.replace(" WHERE ", " AND ")
+    else:
+        query += scope
 
     query += " ORDER BY nome"
 
-    return pd.read_sql_query(query, conn)
+    return pd.read_sql_query(query, conn, params=params)
 
 
 def create_cliente(conn, nome, cpf, telefone, endereco, email="", observacoes="", ativo=True):
@@ -37,9 +44,10 @@ def create_cliente(conn, nome, cpf, telefone, endereco, email="", observacoes=""
         endereco,
         email,
         observacoes,
-        ativo
+        ativo,
+        quiosque_id
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         nome.strip(),
         cpf.strip(),
@@ -48,6 +56,7 @@ def create_cliente(conn, nome, cpf, telefone, endereco, email="", observacoes=""
         email.strip(),
         observacoes.strip(),
         1 if ativo else 0,
+        current_quiosque_id(),
     ))
 
 
@@ -63,7 +72,7 @@ def update_cliente(conn, cliente_id, nome, cpf, telefone, endereco, email, obser
         email = ?,
         observacoes = ?,
         ativo = ?
-    WHERE id = ?
+    WHERE id = ? AND quiosque_id = ?
     """, (
         nome.strip(),
         cpf.strip(),
@@ -73,6 +82,7 @@ def update_cliente(conn, cliente_id, nome, cpf, telefone, endereco, email, obser
         observacoes.strip(),
         1 if ativo else 0,
         cliente_id,
+        current_quiosque_id(),
     ))
     conn.commit()
 

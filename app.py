@@ -16,6 +16,7 @@ from views.novo_lancamento import render_novo_lancamento
 from views.ordem_servico import render_ordem_servico
 from views.usuarios import render_usuarios
 from utils.auth import current_user, logout, require_login
+from utils.quiosques import render_quiosque_filter
 from utils.style import apply_style
 
 
@@ -180,5 +181,7 @@ if "menu_atual" not in st.session_state or st.session_state["menu_atual"] not in
 render_sidebar_navigation(user, auto_backup)
 render_mobile_navigation(user, auto_backup)
 menu = st.session_state["menu_atual"]
+
+render_quiosque_filter(conn, user)
 
 MENU_ITEMS[menu](conn)

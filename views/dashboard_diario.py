@@ -11,6 +11,7 @@ from utils.dashboard_ui import (
     page_header,
     pie_chart,
 )
+from utils.quiosques import scope_clause, scoped_params
 
 
 FORMAS_PAGAMENTO = ["Dinheiro", "Pix", "Crédito", "Débito"]
@@ -21,6 +22,7 @@ def _moeda(valor):
 
 
 def _pagamentos_do_dia(conn, data):
+    scope, params = scope_clause("lancamentos", prefix="AND")
     return pd.read_sql_query("""
     SELECT
         pagamentos.id,
@@ -33,7 +35,7 @@ def _pagamentos_do_dia(conn, data):
     FROM pagamentos
     INNER JOIN lancamentos ON lancamentos.id = pagamentos.lancamento_id
     WHERE lancamentos.data = ?
-    """, conn, params=(data,))
+    """ + scope, conn, params=scoped_params(data))
 
 
 def _formatar_pagamentos_lancamento(grupo):
@@ -199,8 +201,10 @@ def _render_tabela_operacional(df_lancamentos, df_pagamentos, tipo, titulo, acce
 
 
 def render_dashboard_diario(conn):
-    df = pd.read_sql_query("SELECT * FROM lancamentos", conn)
-    df_despesas = pd.read_sql_query("SELECT * FROM despesas", conn)
+    where_lancamentos, params_lancamentos = scope_clause()
+    where_despesas, params_despesas = scope_clause()
+    df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
+    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
 
     min_date, max_date = _safe_date_range(df)
     selected_date = st.date_input(

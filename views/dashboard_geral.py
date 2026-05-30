@@ -2,12 +2,16 @@ import pandas as pd
 import streamlit as st
 
 from utils.dashboard_ui import bar_chart, empty_state, metric_card, moeda, page_header, pie_chart
+from utils.quiosques import scope_clause
 
 
 def render_dashboard_geral(conn):
-    df = pd.read_sql_query("SELECT * FROM lancamentos", conn)
-    df_pagamentos = pd.read_sql_query("SELECT * FROM pagamentos", conn)
-    df_despesas = pd.read_sql_query("SELECT * FROM despesas", conn)
+    where_lancamentos, params_lancamentos = scope_clause()
+    where_pagamentos, params_pagamentos = scope_clause("pagamentos")
+    where_despesas, params_despesas = scope_clause()
+    df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
+    df_pagamentos = pd.read_sql_query(f"SELECT * FROM pagamentos{where_pagamentos}", conn, params=params_pagamentos)
+    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
 
     page_header(
         "Dashboard Geral",

@@ -1,5 +1,7 @@
 import json
 
+from utils.quiosques import current_quiosque_id
+
 
 def log_action(conn, user, acao, entidade, entidade_id=None, detalhes=None):
     cursor = conn.cursor()
@@ -12,9 +14,10 @@ def log_action(conn, user, acao, entidade, entidade_id=None, detalhes=None):
         acao,
         entidade,
         entidade_id,
-        detalhes
+        detalhes,
+        quiosque_id
     )
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         None if not user else user.get("id"),
         "Sistema" if not user else user.get("nome"),
@@ -22,5 +25,6 @@ def log_action(conn, user, acao, entidade, entidade_id=None, detalhes=None):
         entidade,
         entidade_id,
         detalhes_texto,
+        current_quiosque_id(user),
     ))
     conn.commit()
