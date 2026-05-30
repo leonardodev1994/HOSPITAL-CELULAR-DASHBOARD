@@ -11,18 +11,18 @@ PERFIS = ["Admin", "Atendente", "Técnico"]
 def _load_users(conn):
     return pd.read_sql_query("""
     SELECT
-        id,
-        nome,
-        usuario,
-        perfil,
-        ativo,
-        criado_em,
+        usuarios.id,
+        usuarios.nome,
+        usuarios.usuario,
+        usuarios.perfil,
+        usuarios.ativo,
+        usuarios.criado_em,
         usuarios.quiosque_id,
         usuarios.acesso_todos_quiosques,
         quiosques.nome AS quiosque_nome
     FROM usuarios
     LEFT JOIN quiosques ON quiosques.id = usuarios.quiosque_id
-    ORDER BY ativo DESC, nome
+    ORDER BY usuarios.ativo DESC, usuarios.nome
     """, conn)
 
 
