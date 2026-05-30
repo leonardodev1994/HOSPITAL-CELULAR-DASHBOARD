@@ -129,6 +129,28 @@ def _reset_new_cliente_form():
     st.session_state.pop("cliente_novo_ativo", None)
 
 
+def _status_cliente(value):
+    return "Ativo" if int(value or 0) == 1 else "Inativo"
+
+
+def _render_cliente_details(row):
+    col1, col2 = st.columns(2)
+    with col1:
+        st.caption("CPF/CNPJ")
+        st.write(row.cpf or "Não informado")
+        st.caption("E-mail")
+        st.write(row.email or "Não informado")
+    with col2:
+        st.caption("Endereço")
+        st.write(row.endereco or "Não informado")
+        st.caption("Criado em")
+        st.write(row.criado_em or "Não informado")
+
+    if row.observacoes:
+        st.caption("Observações")
+        st.write(row.observacoes)
+
+
 def render_clientes(conn):
     st.subheader("👤 Clientes")
 
@@ -217,79 +239,80 @@ def render_clientes(conn):
         )
         df_filtrado = df_filtrado[filtro]
 
-    for row in df_filtrado.itertuples():
-        col_info, col_action = st.columns([0.8, 0.2])
-        with col_info:
-            st.markdown(f"**{row.nome}**  \n{row.telefone or 'sem telefone'} · {row.cpf or 'sem CPF'}")
-        with col_action:
-            if st.button("Editar", key=f"editar_cliente_{row.id}", width="stretch"):
-                st.session_state["cliente_edit_id"] = int(row.id)
-                st.rerun()
-
     if df_filtrado.empty:
+        st.info("Nenhum cliente encontrado para essa busca.")
         return
 
     selected_id = st.session_state.get("cliente_edit_id")
-    if not selected_id:
-        return
-
-    if selected_id not in set(df_filtrado["id"].astype(int)):
+    if selected_id and selected_id not in set(df_filtrado["id"].astype(int)):
         st.session_state["cliente_edit_id"] = None
-        return
 
-    st.divider()
-    selected = df_clientes[df_clientes["id"] == selected_id].iloc[0]
+    for row in df_filtrado.itertuples():
+        status = _status_cliente(row.ativo)
+        telefone = row.telefone or "sem telefone"
+        title = f"{row.nome} | {telefone} | {status}"
+        expanded = st.session_state.get("cliente_edit_id") == int(row.id)
 
-    with st.form("editar_cliente_form"):
-        st.subheader(f"✏️ Editar cliente: {selected['nome']}")
-        col1, col2, col3 = st.columns(3)
+        with st.expander(title, expanded=expanded):
+            _render_cliente_details(row)
 
-        with col1:
-            nome_edit = st.text_input("Nome", value=selected["nome"] or "")
-            cpf_edit = st.text_input("CPF", value=selected["cpf"] or "")
+            if st.button("✏️ Editar", key=f"editar_cliente_{row.id}", width="stretch"):
+                st.session_state["cliente_edit_id"] = int(row.id)
+                st.rerun()
 
-        with col2:
-            telefone_edit = st.text_input("Telefone", value=selected["telefone"] or "")
-            email_edit = st.text_input("E-mail", value=selected["email"] or "")
+            if st.session_state.get("cliente_edit_id") != int(row.id):
+                continue
 
-        with col3:
-            ativo_edit = st.checkbox("Ativo", value=bool(selected["ativo"]))
+            with st.form(f"editar_cliente_form_{row.id}"):
+                st.markdown("#### Editar cliente")
+                col1, col2, col3 = st.columns(3)
 
-        endereco_edit = st.text_area("Endereço", value=selected["endereco"] or "")
-        observacoes_edit = st.text_area("Observações", value=selected["observacoes"] or "")
+                with col1:
+                    nome_edit = st.text_input("Nome", value=row.nome or "")
+                    cpf_edit = st.text_input("CPF", value=row.cpf or "")
 
-        col_salvar, col_cancelar = st.columns(2)
-        with col_salvar:
-            salvar = st.form_submit_button(
-                "Salvar alterações",
-                disabled=st.session_state["cliente_edit_salvando"],
-            )
-        with col_cancelar:
-            cancelar_edicao = st.form_submit_button("Cancelar edição")
+                with col2:
+                    telefone_edit = st.text_input("Telefone", value=row.telefone or "")
+                    email_edit = st.text_input("E-mail", value=row.email or "")
 
-    if cancelar_edicao:
-        st.session_state["cliente_edit_id"] = None
-        st.rerun()
+                with col3:
+                    ativo_edit = st.checkbox("Ativo", value=bool(row.ativo))
 
-    if salvar and not st.session_state["cliente_edit_salvando"]:
-        if not nome_edit.strip():
-            st.error("Informe o nome do cliente.")
-        else:
-            try:
-                st.session_state["cliente_edit_salvando"] = True
-                update_cliente(
-                    conn,
-                    selected_id,
-                    nome_edit,
-                    cpf_edit,
-                    telefone_edit,
-                    endereco_edit,
-                    email_edit,
-                    observacoes_edit,
-                    ativo_edit,
-                )
-                st.success("✅ Cliente atualizado!")
+                endereco_edit = st.text_area("Endereço", value=row.endereco or "")
+                observacoes_edit = st.text_area("Observações", value=row.observacoes or "")
+
+                col_salvar, col_cancelar = st.columns(2)
+                with col_salvar:
+                    salvar = st.form_submit_button(
+                        "Salvar alterações",
+                        disabled=st.session_state["cliente_edit_salvando"],
+                    )
+                with col_cancelar:
+                    cancelar_edicao = st.form_submit_button("Cancelar edição")
+
+            if cancelar_edicao:
                 st.session_state["cliente_edit_id"] = None
                 st.rerun()
-            finally:
-                st.session_state["cliente_edit_salvando"] = False
+
+            if salvar and not st.session_state["cliente_edit_salvando"]:
+                if not nome_edit.strip():
+                    st.error("Informe o nome do cliente.")
+                else:
+                    try:
+                        st.session_state["cliente_edit_salvando"] = True
+                        update_cliente(
+                            conn,
+                            int(row.id),
+                            nome_edit,
+                            cpf_edit,
+                            telefone_edit,
+                            endereco_edit,
+                            email_edit,
+                            observacoes_edit,
+                            ativo_edit,
+                        )
+                        st.success("✅ Cliente atualizado!")
+                        st.session_state["cliente_edit_id"] = None
+                        st.rerun()
+                    finally:
+                        st.session_state["cliente_edit_salvando"] = False

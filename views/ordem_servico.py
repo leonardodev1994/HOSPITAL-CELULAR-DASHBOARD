@@ -407,18 +407,39 @@ def _render_file_preview(label, path):
         return
 
     file_path = Path(path)
-    with st.expander(f"Visualizar {label}", expanded=False):
-        if _is_image_file(file_path):
-            st.image(str(file_path), caption=file_path.name, width=320)
-        else:
-            st.caption(file_path.name)
+    file_key = abs(hash(str(file_path)))
 
-        st.download_button(
-            "Baixar arquivo",
-            data=file_path.read_bytes(),
-            file_name=file_path.name,
-            key=f"download_{abs(hash(str(file_path)))}",
-        )
+    if _is_image_file(file_path):
+        st.caption(label)
+        st.image(str(file_path), caption=file_path.name, width=160)
+        st.caption("Toque em ampliar para ver a foto completa.")
+        if hasattr(st, "popover"):
+            with st.popover("🔍 Ampliar foto"):
+                st.image(str(file_path), caption=file_path.name, use_container_width=True)
+                st.download_button(
+                    "Baixar foto",
+                    data=file_path.read_bytes(),
+                    file_name=file_path.name,
+                    key=f"download_{file_key}",
+                )
+        else:
+            with st.expander("🔍 Ampliar foto", expanded=False):
+                st.image(str(file_path), caption=file_path.name, use_container_width=True)
+                st.download_button(
+                    "Baixar foto",
+                    data=file_path.read_bytes(),
+                    file_name=file_path.name,
+                    key=f"download_{file_key}",
+                )
+        return
+
+    st.caption(file_path.name)
+    st.download_button(
+        "Baixar arquivo",
+        data=file_path.read_bytes(),
+        file_name=file_path.name,
+        key=f"download_{file_key}",
+    )
 
 
 def _radio_value(label, options, current, key, horizontal=True):
@@ -1020,9 +1041,14 @@ def _render_edit_form(conn, os_id):
         entrada["possui_backup"] = _radio_value("Possui backup?", YES_NO, entrada.get("possui_backup", "Não"), f"entrada_backup_{os_id}")
         entrada["ja_reparou"] = _radio_value("Já fez algum reparo neste aparelho?", ["Sim", "Não", "Não sabe"], entrada.get("ja_reparou", "Não sabe"), f"entrada_reparo_anterior_{os_id}")
         entrada["tests"] = _render_checklist(f"entrada_tests_{os_id}", CHECKLIST_ENTRADA, entrada.get("tests", {}))
-        entrada["foto_frente"] = _render_upload("Foto frontal de entrada", entrada, os_id, "foto_frente", "entrada")
-        entrada["foto_tras"] = _render_upload("Foto traseira de entrada", entrada, os_id, "foto_tras", "entrada")
-        entrada["foto_extra"] = _render_upload("Foto extra de entrada", entrada, os_id, "foto_extra", "entrada")
+        st.markdown("#### Galeria de entrada")
+        foto_cols = st.columns(3)
+        with foto_cols[0]:
+            entrada["foto_frente"] = _render_upload("Foto frontal de entrada", entrada, os_id, "foto_frente", "entrada")
+        with foto_cols[1]:
+            entrada["foto_tras"] = _render_upload("Foto traseira de entrada", entrada, os_id, "foto_tras", "entrada")
+        with foto_cols[2]:
+            entrada["foto_extra"] = _render_upload("Foto extra de entrada", entrada, os_id, "foto_extra", "entrada")
         entrada["observacoes"] = st.text_area("Observações sobre entrada", value=entrada.get("observacoes", ""), key=f"entrada_obs_{os_id}")
         st.markdown("#### Assinatura de entrada")
         assinatura_entrada_canvas = _render_signature(
@@ -1037,19 +1063,29 @@ def _render_edit_form(conn, os_id):
         reparo["tecnico"] = st.text_input("Técnico do reparo", value=reparo.get("tecnico", ""), key=f"reparo_tecnico_{os_id}")
         reparo["aparelho_molhou"] = _radio_value("Aparelho já molhou?", YES_NO, reparo.get("aparelho_molhou", "Não"), f"reparo_molhou_{os_id}")
         reparo["falta_componentes"] = _radio_value("Possui falta de componentes internos?", YES_NO, reparo.get("falta_componentes", "Não"), f"reparo_componentes_{os_id}")
-        reparo["foto_interna"] = _render_upload("Foto interna do aparelho", reparo, os_id, "foto_interna", "reparo")
-        reparo["foto_interna_extra"] = _render_upload("Foto interna extra", reparo, os_id, "foto_interna_extra", "reparo")
+        st.markdown("#### Galeria do reparo")
+        foto_cols = st.columns(3)
+        with foto_cols[0]:
+            reparo["foto_interna"] = _render_upload("Foto interna do aparelho", reparo, os_id, "foto_interna", "reparo")
+        with foto_cols[1]:
+            reparo["foto_interna_extra"] = _render_upload("Foto interna extra", reparo, os_id, "foto_interna_extra", "reparo")
+        with foto_cols[2]:
+            reparo["foto_peca"] = _render_upload("Foto da peça", reparo, os_id, "foto_peca", "reparo")
         reparo["servico_realizado"] = st.text_area("Serviço realizado no reparo", value=reparo.get("servico_realizado", ""), key=f"reparo_servico_{os_id}")
         reparo["fornecedor"] = st.text_input("Fornecedor", value=reparo.get("fornecedor", ""), key=f"reparo_fornecedor_{os_id}")
-        reparo["foto_peca"] = _render_upload("Foto da peça", reparo, os_id, "foto_peca", "reparo")
         reparo["observacoes"] = st.text_area("Observações do reparo", value=reparo.get("observacoes", ""), key=f"reparo_obs_{os_id}")
 
     with tab_saida:
         st.markdown("#### Testes de saída")
         saida["tests"] = _render_checklist(f"saida_tests_{os_id}", CHECKLIST_SAIDA, saida.get("tests", {}))
-        saida["foto_frente"] = _render_upload("Foto frontal de saída", saida, os_id, "foto_frente", "saida")
-        saida["foto_tras"] = _render_upload("Foto traseira de saída", saida, os_id, "foto_tras", "saida")
-        saida["foto_extra"] = _render_upload("Foto extra de saída", saida, os_id, "foto_extra", "saida")
+        st.markdown("#### Galeria de saída")
+        foto_cols = st.columns(3)
+        with foto_cols[0]:
+            saida["foto_frente"] = _render_upload("Foto frontal de saída", saida, os_id, "foto_frente", "saida")
+        with foto_cols[1]:
+            saida["foto_tras"] = _render_upload("Foto traseira de saída", saida, os_id, "foto_tras", "saida")
+        with foto_cols[2]:
+            saida["foto_extra"] = _render_upload("Foto extra de saída", saida, os_id, "foto_extra", "saida")
         saida["observacoes"] = st.text_area("Observações de saída", value=saida.get("observacoes", ""), key=f"saida_obs_{os_id}")
         saida["cliente_levou_tela"] = _radio_value("Cliente levou a tela?", YES_NO, saida.get("cliente_levou_tela", "Não"), f"saida_tela_{os_id}")
         st.markdown("#### Assinatura de saída")
