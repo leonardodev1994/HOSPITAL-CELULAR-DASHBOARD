@@ -100,6 +100,15 @@ def connect_postgres(database_url):
 MIGRATIONS = [
     ("0001_initial_schema", "_migration_0001_initial_schema"),
     ("0002_quiosques", "_migration_0002_quiosques"),
+    ("0003_renomeia_quiosques", "_migration_0003_renomeia_quiosques"),
+]
+
+
+QUIOSQUES_PADRAO = [
+    (1, "Polo 1", "polo1"),
+    (2, "Polo 2", "polo2"),
+    (3, "São Luiz", "saoluiz"),
+    (4, "Peixinho", "peixinho"),
 ]
 
 
@@ -176,6 +185,12 @@ def _migration_0002_quiosques(conn):
         return
 
     _create_sqlite_quiosque_schema(conn)
+
+
+def _migration_0003_renomeia_quiosques(conn):
+    cursor = conn.cursor()
+    _seed_quiosques(cursor)
+    _rename_quiosque_users(conn)
 
 
 def _create_sqlite_schema(conn):
@@ -596,10 +611,16 @@ def _create_postgres_quiosque_schema(conn):
 
 
 def _seed_quiosques(cursor):
-    for quiosque_id in range(1, 5):
+    for quiosque_id, nome, _usuario in QUIOSQUES_PADRAO:
         cursor.execute(
-            "INSERT INTO quiosques (id, nome, ativo) VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING",
-            (quiosque_id, f"Quiosque {quiosque_id}", 1),
+            """
+            INSERT INTO quiosques (id, nome, ativo)
+            VALUES (?, ?, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                nome = excluded.nome,
+                ativo = excluded.ativo
+            """,
+            (quiosque_id, nome, 1),
         )
 
 
@@ -607,8 +628,7 @@ def _seed_quiosque_users(conn):
     from utils.auth import hash_password
 
     cursor = conn.cursor()
-    for quiosque_id in range(1, 5):
-        usuario = f"quiosque{quiosque_id}"
+    for quiosque_id, nome, usuario in QUIOSQUES_PADRAO:
         exists = cursor.execute(
             "SELECT id FROM usuarios WHERE usuario = ? LIMIT 1",
             (usuario,),
@@ -616,7 +636,7 @@ def _seed_quiosque_users(conn):
         if exists:
             continue
 
-        salt, password_hash = hash_password(f"quiosque{quiosque_id}")
+        salt, password_hash = hash_password(usuario)
         cursor.execute("""
         INSERT INTO usuarios (
             nome,
@@ -630,7 +650,7 @@ def _seed_quiosque_users(conn):
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            f"Quiosque {quiosque_id}",
+            nome,
             usuario,
             password_hash,
             salt,
@@ -639,6 +659,37 @@ def _seed_quiosque_users(conn):
             quiosque_id,
             0,
         ))
+
+    _rename_quiosque_users(conn)
+
+
+def _rename_quiosque_users(conn):
+    from utils.auth import hash_password
+
+    cursor = conn.cursor()
+    for quiosque_id, nome, usuario in QUIOSQUES_PADRAO:
+        legacy_user = f"quiosque{quiosque_id}"
+        official_exists = cursor.execute(
+            "SELECT id FROM usuarios WHERE usuario = ? LIMIT 1",
+            (usuario,),
+        ).fetchone()
+
+        if official_exists:
+            cursor.execute(
+                "UPDATE usuarios SET nome = ?, quiosque_id = ? WHERE usuario = ?",
+                (nome, quiosque_id, usuario),
+            )
+            continue
+
+        salt, password_hash = hash_password(usuario)
+        cursor.execute(
+            """
+            UPDATE usuarios
+            SET nome = ?, usuario = ?, senha_hash = ?, senha_salt = ?, quiosque_id = ?
+            WHERE usuario = ?
+            """,
+            (nome, usuario, password_hash, salt, quiosque_id, legacy_user),
+        )
 
 
 def execute_insert_returning_id(conn, cursor, query, params):
