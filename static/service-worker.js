@@ -1,18 +1,18 @@
-const CACHE_NAME = "hospital-celular-pwa-v4";
+const CACHE_NAME = "hospital-celular-pwa-v5";
 const STATIC_ASSETS = [
   "/",
   "/app/static/manifest.json",
-  "/app/static/manifest.json?v=tx-icon-v4",
+  "/app/static/manifest.json?v=tx-icon-v5",
   "/app/static/favicon.png",
-  "/app/static/favicon.png?v=tx-icon-v4",
+  "/app/static/favicon.png?v=tx-icon-v5",
   "/app/static/apple-touch-icon.png",
-  "/app/static/apple-touch-icon.png?v=tx-icon-v4",
+  "/app/static/apple-touch-icon.png?v=tx-icon-v5",
   "/app/static/apple-touch-icon-precomposed.png",
-  "/app/static/apple-touch-icon-precomposed.png?v=tx-icon-v4",
+  "/app/static/apple-touch-icon-precomposed.png?v=tx-icon-v5",
   "/app/static/icon-192.png",
-  "/app/static/icon-192.png?v=tx-icon-v4",
+  "/app/static/icon-192.png?v=tx-icon-v5",
   "/app/static/icon-512.png",
-  "/app/static/icon-512.png?v=tx-icon-v4"
+  "/app/static/icon-512.png?v=tx-icon-v5"
 ];
 
 self.addEventListener("install", (event) => {

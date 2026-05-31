@@ -18,11 +18,11 @@ def apply_style():
     logo_uri = _logo_data_uri()
     st.markdown(
         """
-        <link rel="manifest" href="/app/static/manifest.json?v=tx-icon-v4">
-        <link rel="icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v4">
-        <link rel="shortcut icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v4">
-        <link rel="apple-touch-icon" sizes="180x180" href="/app/static/apple-touch-icon.png?v=tx-icon-v4">
-        <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/app/static/apple-touch-icon-precomposed.png?v=tx-icon-v4">
+        <link rel="manifest" href="/app/static/manifest.json?v=tx-icon-v5">
+        <link rel="icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v5">
+        <link rel="shortcut icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v5">
+        <link rel="apple-touch-icon" sizes="180x180" href="/app/static/apple-touch-icon.png?v=tx-icon-v5">
+        <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/app/static/apple-touch-icon-precomposed.png?v=tx-icon-v5">
         <meta name="theme-color" content="#ffffff">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2460,7 +2460,7 @@ def apply_style():
                 el.setAttribute("content", content);
             }
 
-            const version = "tx-icon-v4";
+            const version = "tx-icon-v5";
             const staticBase = `${window.parent.location.origin}/app/static`;
             const manifestUrl = `${staticBase}/manifest.json?v=${version}`;
             const faviconUrl = `${staticBase}/favicon.png?v=${version}`;
