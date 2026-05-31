@@ -1,6 +1,8 @@
 import hashlib
 import hmac
 import os
+import base64
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -8,6 +10,29 @@ import streamlit as st
 
 DEFAULT_ADMIN_USER = "admin"
 DEFAULT_ADMIN_PASSWORD = "admin123"
+BRANDING_DIR = Path(__file__).resolve().parents[1] / "assets" / "branding"
+LOGIN_BANNER_PATH = BRANDING_DIR / "tx_login_banner.webp"
+LOGIN_LOGO_PATH = BRANDING_DIR / "tx_logo_icon.png"
+
+
+def _image_data_uri(path):
+    if not path.exists():
+        return ""
+
+    image_bytes = path.read_bytes()
+    suffix = path.suffix.lower()
+    mime_type = "image/png"
+    if image_bytes.startswith(b"\x89PNG"):
+        mime_type = "image/png"
+    elif image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        mime_type = "image/webp"
+    elif image_bytes.startswith(b"\xff\xd8"):
+        mime_type = "image/jpeg"
+    elif suffix in {".jpg", ".jpeg"}:
+        mime_type = "image/jpeg"
+
+    encoded = base64.b64encode(image_bytes).decode("utf-8")
+    return f"data:{mime_type};base64,{encoded}"
 
 
 def hash_password(password, salt=None):
@@ -114,26 +139,65 @@ def require_login(conn):
     if is_logged_in():
         return True
 
-    st.markdown("## Hospital do Celular")
-    st.caption("Acesse sua conta para continuar")
+    banner_uri = _image_data_uri(LOGIN_BANNER_PATH)
+    logo_uri = _image_data_uri(LOGIN_LOGO_PATH)
 
-    with st.form("login_form"):
-        username = st.text_input("Usuário")
-        password = st.text_input("Senha", type="password")
-        submitted = st.form_submit_button("Entrar")
+    st.markdown('<div class="tx-login-page"></div>', unsafe_allow_html=True)
 
-    if submitted:
-        user = authenticate_user(conn, username, password)
+    art_col, form_col = st.columns([1.08, 0.92], gap="large")
 
-        if user:
-            st.session_state["usuario_logado"] = user
-            st.rerun()
+    with art_col:
+        if banner_uri:
+            st.markdown(
+                f"""
+                <div class="tx-login-art">
+                    <img src="{banner_uri}" alt="Tecnologia urbana para gestao inteligente">
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         else:
-            st.error("Usuário ou senha inválidos.")
+            st.markdown(
+                """
+                <div class="tx-login-art tx-login-art-fallback">
+                    <strong>TX</strong>
+                    <span>Tecnologia urbana para gestao inteligente.</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-    with st.expander("Primeiro acesso"):
-        st.write(f"Usuário: `{DEFAULT_ADMIN_USER}`")
-        st.write(f"Senha: `{DEFAULT_ADMIN_PASSWORD}`")
-        st.caption("Depois crie seus funcionários e altere a senha padrão.")
+    with form_col:
+        st.markdown(
+            f"""
+            <div class="tx-login-brand">
+                {'<img src="' + logo_uri + '" alt="TX System">' if logo_uri else '<strong>TX</strong>'}
+                <div>
+                    <h1>TX System</h1>
+                    <p>Gestao inteligente, resultado previsivel.</p>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.form("login_form"):
+            username = st.text_input("Usuário")
+            password = st.text_input("Senha", type="password")
+            submitted = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+
+        if submitted:
+            user = authenticate_user(conn, username, password)
+
+            if user:
+                st.session_state["usuario_logado"] = user
+                st.rerun()
+            else:
+                st.error("Usuário ou senha inválidos.")
+
+        with st.expander("Primeiro acesso"):
+            st.write(f"Usuário: `{DEFAULT_ADMIN_USER}`")
+            st.write(f"Senha: `{DEFAULT_ADMIN_PASSWORD}`")
+            st.caption("Depois crie seus funcionários e altere a senha padrão.")
 
     return False

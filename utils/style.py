@@ -2443,6 +2443,289 @@ def apply_style():
     </style>
     """, unsafe_allow_html=True)
 
+    st.markdown("""
+    <style>
+    .stApp:has(.tx-login-page) {
+        background:
+            radial-gradient(circle at 12% 12%, rgba(22, 163, 74, .08), transparent 24rem),
+            linear-gradient(135deg, #FFFFFF 0%, #F7F9FC 48%, #EEF2F7 100%) !important;
+    }
+
+    .stApp:has(.tx-login-page) [data-testid="stHeader"],
+    .stApp:has(.tx-login-page) section[data-testid="stSidebar"],
+    .stApp:has(.tx-login-page) [data-testid="collapsedControl"],
+    .stApp:has(.tx-login-page) #MainMenu,
+    .stApp:has(.tx-login-page) footer {
+        display: none !important;
+    }
+
+    .main .block-container:has(.tx-login-page) {
+        max-width: 1180px !important;
+        min-height: 100dvh;
+        padding: 2.4rem 1.35rem !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .main .block-container:has(.tx-login-page) [data-testid="stHorizontalBlock"] {
+        align-items: stretch;
+        gap: clamp(1.2rem, 3vw, 2.4rem);
+    }
+
+    .main .block-container:has(.tx-login-page) [data-testid="column"]:has(.tx-login-art),
+    .main .block-container:has(.tx-login-page) [data-testid="column"]:has(.tx-login-brand) {
+        min-height: min(720px, calc(100dvh - 5rem));
+    }
+
+    .tx-login-art {
+        position: relative;
+        height: 100%;
+        min-height: min(720px, calc(100dvh - 5rem));
+        padding: 10px;
+        overflow: hidden;
+        border-radius: 28px;
+        background:
+            linear-gradient(145deg, rgba(255, 255, 255, .96), rgba(244, 247, 250, .88)),
+            #FFFFFF;
+        border: 1px solid rgba(17, 24, 39, .08);
+        box-shadow: 0 26px 70px rgba(17, 24, 39, .16);
+    }
+
+    .tx-login-art::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        border-radius: inherit;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .52), inset 0 -80px 110px rgba(0, 0, 0, .24);
+    }
+
+    .tx-login-art img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: inherit;
+        object-fit: cover;
+        border-radius: 22px;
+        filter: saturate(1.02) contrast(1.02);
+    }
+
+    .tx-login-art-fallback {
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: #FFFFFF !important;
+        background: linear-gradient(145deg, #101514, #0B0F0D);
+    }
+
+    .tx-login-art-fallback strong {
+        color: #53D56C !important;
+        font-size: clamp(4rem, 12vw, 8rem);
+        line-height: 1;
+    }
+
+    .tx-login-art-fallback span {
+        color: rgba(255, 255, 255, .72) !important;
+    }
+
+    .main .block-container:has(.tx-login-page) [data-testid="column"]:has(.tx-login-brand) {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: clamp(1.2rem, 3vw, 2.35rem);
+        border: 1px solid rgba(17, 24, 39, .08);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, .88) !important;
+        box-shadow: 0 24px 70px rgba(17, 24, 39, .12);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+    }
+
+    .tx-login-brand {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 1.15rem;
+    }
+
+    .tx-login-brand img {
+        width: 76px;
+        height: 76px;
+        object-fit: cover;
+        border-radius: 20px;
+        background: #050706;
+        box-shadow: 0 16px 32px rgba(17, 24, 39, .18), 0 0 0 1px rgba(22, 163, 74, .16);
+    }
+
+    .tx-login-brand strong {
+        display: grid;
+        place-items: center;
+        width: 76px;
+        height: 76px;
+        border-radius: 20px;
+        color: #53D56C !important;
+        background: #050706;
+        font-size: 1.4rem;
+        font-weight: 900;
+    }
+
+    .tx-login-brand h1 {
+        margin: 0 !important;
+        color: #101828 !important;
+        font-size: clamp(2rem, 4vw, 2.65rem) !important;
+        font-weight: 850 !important;
+        line-height: 1.02 !important;
+        letter-spacing: 0 !important;
+    }
+
+    .tx-login-brand p {
+        margin: .42rem 0 0 !important;
+        color: #667085 !important;
+        font-size: 1rem !important;
+        line-height: 1.45 !important;
+    }
+
+    .main .block-container:has(.tx-login-page) [data-testid="stForm"] {
+        margin-top: .65rem;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .main .block-container:has(.tx-login-page) label,
+    .main .block-container:has(.tx-login-page) label p {
+        color: #344054 !important;
+        font-weight: 720 !important;
+    }
+
+    .main .block-container:has(.tx-login-page) input,
+    .main .block-container:has(.tx-login-page) [data-baseweb="input"] > div {
+        min-height: 50px !important;
+        border-radius: 14px !important;
+        border: 1px solid #D0D5DD !important;
+        background: #FFFFFF !important;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, .04) !important;
+    }
+
+    .main .block-container:has(.tx-login-page) input:focus,
+    .main .block-container:has(.tx-login-page) [data-baseweb="input"] > div:focus-within {
+        border-color: #16A34A !important;
+        box-shadow: 0 0 0 4px rgba(22, 163, 74, .10) !important;
+    }
+
+    .main .block-container:has(.tx-login-page) .stButton button,
+    .main .block-container:has(.tx-login-page) button[kind="primary"] {
+        min-height: 52px !important;
+        margin-top: .55rem;
+        border: 0 !important;
+        border-radius: 14px !important;
+        background: linear-gradient(135deg, #22C55E, #15803D) !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 16px 34px rgba(22, 163, 74, .24) !important;
+        font-weight: 820 !important;
+    }
+
+    .main .block-container:has(.tx-login-page) .stButton button:hover,
+    .main .block-container:has(.tx-login-page) button[kind="primary"]:hover {
+        filter: brightness(1.02);
+        transform: translateY(-1px);
+        box-shadow: 0 20px 38px rgba(22, 163, 74, .28) !important;
+    }
+
+    .main .block-container:has(.tx-login-page) button[kind="primary"] p {
+        color: #FFFFFF !important;
+    }
+
+    .main .block-container:has(.tx-login-page) [data-testid="stExpander"] details {
+        margin-top: 1rem;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 14px !important;
+        background: #FFFFFF !important;
+        box-shadow: none !important;
+        overflow: hidden;
+    }
+
+    .main .block-container:has(.tx-login-page) [data-testid="stExpander"] summary {
+        background: #FFFFFF !important;
+        color: #344054 !important;
+        font-weight: 720;
+    }
+
+    .main .block-container:has(.tx-login-page) [data-testid="stExpander"] summary:hover {
+        background: #F9FAFB !important;
+    }
+
+    @media (max-width: 768px) {
+        .main .block-container:has(.tx-login-page) {
+            min-height: 100dvh;
+            padding: 1rem .8rem 1.4rem !important;
+            justify-content: flex-start;
+        }
+
+        .main .block-container:has(.tx-login-page) [data-testid="stHorizontalBlock"] {
+            gap: .9rem;
+        }
+
+        .main .block-container:has(.tx-login-page) [data-testid="column"]:has(.tx-login-art),
+        .main .block-container:has(.tx-login-page) [data-testid="column"]:has(.tx-login-brand) {
+            min-height: auto;
+            width: 100% !important;
+        }
+
+        .tx-login-art {
+            min-height: auto;
+            height: clamp(172px, 42vw, 230px);
+            padding: 6px;
+            border-radius: 22px;
+            box-shadow: 0 16px 38px rgba(17, 24, 39, .14);
+        }
+
+        .tx-login-art img {
+            min-height: 0;
+            height: 100%;
+            border-radius: 17px;
+        }
+
+        .main .block-container:has(.tx-login-page) [data-testid="column"]:has(.tx-login-brand) {
+            padding: 1.2rem;
+            border-radius: 22px;
+            box-shadow: 0 16px 38px rgba(17, 24, 39, .11);
+        }
+
+        .tx-login-brand {
+            grid-template-columns: 58px minmax(0, 1fr);
+            gap: 12px;
+            margin-bottom: .8rem;
+        }
+
+        .tx-login-brand img,
+        .tx-login-brand strong {
+            width: 58px;
+            height: 58px;
+            border-radius: 16px;
+        }
+
+        .tx-login-brand h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .tx-login-brand p {
+            font-size: .92rem !important;
+        }
+
+        .main .block-container:has(.tx-login-page) input,
+        .main .block-container:has(.tx-login-page) [data-baseweb="input"] > div,
+        .main .block-container:has(.tx-login-page) .stButton button,
+        .main .block-container:has(.tx-login-page) button[kind="primary"] {
+            min-height: 54px !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     components.html(
         """
         <script>
