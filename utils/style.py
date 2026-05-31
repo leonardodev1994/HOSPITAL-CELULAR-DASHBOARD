@@ -2466,6 +2466,7 @@ def apply_style():
             upsertLink("icon", "/app/static/favicon.png", { type: "image/png" });
             upsertLink("shortcut icon", "/app/static/favicon.png", { type: "image/png" });
             upsertLink("apple-touch-icon", "/app/static/apple-touch-icon.png", { sizes: "180x180" });
+            upsertLink("apple-touch-icon-precomposed", "/app/static/apple-touch-icon.png", { sizes: "180x180" });
 
             if ("serviceWorker" in window.parent.navigator) {
                 window.parent.navigator.serviceWorker.register("/app/static/service-worker.js").catch(function () {});

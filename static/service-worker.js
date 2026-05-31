@@ -1,7 +1,9 @@
-const CACHE_NAME = "hospital-celular-pwa-v1";
+const CACHE_NAME = "hospital-celular-pwa-v2";
 const STATIC_ASSETS = [
   "/",
   "/app/static/manifest.json",
+  "/app/static/favicon.png",
+  "/app/static/apple-touch-icon.png",
   "/app/static/icon-192.png",
   "/app/static/icon-512.png"
 ];
