@@ -1,11 +1,11 @@
-const CACHE_NAME = "hospital-celular-pwa-v2";
+const CACHE_NAME = "hospital-celular-pwa-v3";
 const STATIC_ASSETS = [
   "/",
-  "/app/static/manifest.json",
-  "/app/static/favicon.png",
-  "/app/static/apple-touch-icon.png",
-  "/app/static/icon-192.png",
-  "/app/static/icon-512.png"
+  "/app/static/manifest.json?v=tx-icon-v3",
+  "/app/static/favicon.png?v=tx-icon-v3",
+  "/app/static/apple-touch-icon.png?v=tx-icon-v3",
+  "/app/static/icon-192.png?v=tx-icon-v3",
+  "/app/static/icon-512.png?v=tx-icon-v3"
 ];
 
 self.addEventListener("install", (event) => {

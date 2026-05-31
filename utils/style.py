@@ -2445,31 +2445,56 @@ def apply_style():
                 el.setAttribute("content", content);
             }
 
-            function upsertLink(rel, href, extra) {
-                let el = head.querySelector(`link[rel="${rel}"][href="${href}"]`);
-                if (!el) {
-                    el = doc.createElement("link");
-                    el.setAttribute("rel", rel);
-                    el.setAttribute("href", href);
-                    head.appendChild(el);
-                }
+            const version = "tx-icon-v3";
+            const staticBase = `${window.parent.location.origin}/app/static`;
+            const manifestUrl = `${staticBase}/manifest.json?v=${version}`;
+            const faviconUrl = `${staticBase}/favicon.png?v=${version}`;
+            const appleIconUrl = `${staticBase}/apple-touch-icon.png?v=${version}`;
+
+            function removeLinks(selector) {
+                head.querySelectorAll(selector).forEach((el) => el.remove());
+            }
+
+            function appendLink(rel, href, extra) {
+                const el = doc.createElement("link");
+                el.setAttribute("rel", rel);
+                el.setAttribute("href", href);
                 Object.entries(extra || {}).forEach(([key, value]) => el.setAttribute(key, value));
+                head.appendChild(el);
             }
 
             upsertMeta("viewport", "width=device-width, initial-scale=1, viewport-fit=cover");
             upsertMeta("theme-color", "#ffffff");
             upsertMeta("apple-mobile-web-app-capable", "yes");
             upsertMeta("apple-mobile-web-app-status-bar-style", "default");
-            upsertMeta("apple-mobile-web-app-title", "Hospital do Celular");
+            upsertMeta("apple-mobile-web-app-title", "TX System");
 
-            upsertLink("manifest", "/app/static/manifest.json");
-            upsertLink("icon", "/app/static/favicon.png", { type: "image/png" });
-            upsertLink("shortcut icon", "/app/static/favicon.png", { type: "image/png" });
-            upsertLink("apple-touch-icon", "/app/static/apple-touch-icon.png", { sizes: "180x180" });
-            upsertLink("apple-touch-icon-precomposed", "/app/static/apple-touch-icon.png", { sizes: "180x180" });
+            doc.title = "TX System";
+
+            removeLinks('link[rel="manifest"]');
+            removeLinks('link[rel="icon"]');
+            removeLinks('link[rel="shortcut icon"]');
+            removeLinks('link[rel="apple-touch-icon"]');
+            removeLinks('link[rel="apple-touch-icon-precomposed"]');
+            removeLinks('link[href*="favicon"]');
+            removeLinks('link[href*="apple-touch-icon"]');
+
+            appendLink("manifest", manifestUrl);
+            appendLink("icon", faviconUrl, { type: "image/png", sizes: "64x64" });
+            appendLink("shortcut icon", faviconUrl, { type: "image/png", sizes: "64x64" });
+            appendLink("apple-touch-icon", appleIconUrl, { sizes: "180x180" });
+            appendLink("apple-touch-icon-precomposed", appleIconUrl, { sizes: "180x180" });
 
             if ("serviceWorker" in window.parent.navigator) {
-                window.parent.navigator.serviceWorker.register("/app/static/service-worker.js").catch(function () {});
+                window.parent.navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                    registrations.forEach(function (registration) {
+                        if (registration.active && registration.active.scriptURL.includes("/app/static/service-worker.js")) {
+                            registration.unregister();
+                        }
+                    });
+                }).finally(function () {
+                    window.parent.navigator.serviceWorker.register(`${staticBase}/service-worker.js?v=${version}`).catch(function () {});
+                });
             }
         })();
         </script>
