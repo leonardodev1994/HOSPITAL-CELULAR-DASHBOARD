@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="TX System - Hospital do Celular">
+  <meta name="theme-color" content="#050607">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="TX System">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+
+  <title>TX System</title>
+
+  <link rel="manifest" href="./manifest.json?v=tx-landing-v1">
+  <link rel="icon" type="image/png" sizes="64x64" href="./favicon.png?v=tx-landing-v1">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=tx-landing-v1">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./apple-touch-icon-precomposed.png?v=tx-landing-v1">
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050607;
+      --panel: rgba(255, 255, 255, 0.075);
+      --border: rgba(255, 255, 255, 0.14);
+      --text: #f6f8f7;
+      --muted: #a7b1ad;
+      --green: #35d06f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(53, 208, 111, 0.13), transparent 28rem),
+        linear-gradient(145deg, #090b0c 0%, var(--bg) 52%, #010101 100%);
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: grid;
+      min-height: 100dvh;
+      padding: max(24px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom));
+      place-items: center;
+      overflow: hidden;
+    }
+
+    body::before {
+      position: fixed;
+      inset: auto -16vw -22vh auto;
+      width: min(82vw, 620px);
+      aspect-ratio: 1;
+      content: "";
+      background: url("./icon-512.png?v=tx-landing-v1") center / contain no-repeat;
+      filter: blur(1px);
+      opacity: 0.045;
+      pointer-events: none;
+      transform: rotate(-8deg);
+    }
+
+    main {
+      position: relative;
+      width: min(100%, 420px);
+      padding: 32px 22px 24px;
+      text-align: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52), 0 0 44px rgba(53, 208, 111, 0.08);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .logo {
+      width: 116px;
+      height: 116px;
+      margin: 0 auto 18px;
+      display: block;
+      border-radius: 26px;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48), 0 0 26px rgba(53, 208, 111, 0.14);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 8vw, 2.45rem);
+      font-weight: 760;
+      letter-spacing: 0;
+      line-height: 1.02;
+    }
+
+    p {
+      margin: 12px auto 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.5;
+    }
+
+    .loader {
+      width: 44px;
+      height: 44px;
+      margin: 24px auto 18px;
+      border: 3px solid rgba(255, 255, 255, 0.16);
+      border-top-color: var(--green);
+      border-radius: 999px;
+      animation: spin 0.9s linear infinite;
+    }
+
+    button {
+      width: 100%;
+      min-height: 52px;
+      margin-top: 8px;
+      appearance: none;
+      border: 1px solid rgba(53, 208, 111, 0.36);
+      border-radius: 16px;
+      color: #061109;
+      background: linear-gradient(180deg, #61e88d, #29bf61);
+      box-shadow: 0 12px 30px rgba(53, 208, 111, 0.18);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 750;
+    }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 0.78rem;
+      color: rgba(246, 248, 247, 0.58);
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 420px) {
+      main {
+        padding: 28px 18px 22px;
+        border-radius: 24px;
+      }
+
+      .logo {
+        width: 104px;
+        height: 104px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <img class="logo" src="./apple-touch-icon.png?v=tx-landing-v1" alt="TX System">
+    <h1>TX System</h1>
+    <p>Hospital do Celular</p>
+    <div class="loader" aria-hidden="true"></div>
+    <button id="openApp" type="button">Abrir sistema</button>
+    <p class="hint">Carregando o painel seguro...</p>
+  </main>
+
+  <script>
+    const STREAMLIT_APP_URL = "https://hospital-celular-dashboard.streamlit.app/";
+    const REDIRECT_DELAY_MS = 1200;
+
+    function openSystem() {
+      window.location.replace(STREAMLIT_APP_URL);
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./service-worker.js?v=tx-landing-v1").catch(() => {});
+    }
+
+    document.getElementById("openApp").addEventListener("click", openSystem);
+    window.setTimeout(openSystem, REDIRECT_DELAY_MS);
+  </script>
+</body>
+</html>
