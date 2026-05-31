@@ -5,7 +5,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 
-LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
+LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "branding" / "tx_logo_icon.png"
 
 
 def _logo_data_uri():
@@ -18,11 +18,12 @@ def apply_style():
     logo_uri = _logo_data_uri()
     st.markdown(
         """
-        <link rel="manifest" href="/app/static/manifest.json?v=tx-icon-v5">
-        <link rel="icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v5">
-        <link rel="shortcut icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v5">
-        <link rel="apple-touch-icon" sizes="180x180" href="/app/static/apple-touch-icon.png?v=tx-icon-v5">
-        <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/app/static/apple-touch-icon-precomposed.png?v=tx-icon-v5">
+        <link rel="manifest" href="/app/static/manifest.json?v=tx-brand-v6">
+        <link rel="icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-brand-v6">
+        <link rel="icon" href="/app/static/favicon.ico?v=tx-brand-v6">
+        <link rel="shortcut icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-brand-v6">
+        <link rel="apple-touch-icon" sizes="180x180" href="/app/static/apple-touch-icon.png?v=tx-brand-v6">
+        <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/app/static/apple-touch-icon-precomposed.png?v=tx-brand-v6">
         <meta name="theme-color" content="#ffffff">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2480,8 +2481,9 @@ def apply_style():
 
     .tx-login-art {
         position: relative;
-        height: 100%;
-        min-height: min(720px, calc(100dvh - 5rem));
+        height: auto;
+        min-height: 0;
+        aspect-ratio: 3 / 2;
         padding: 10px;
         overflow: hidden;
         border-radius: 28px;
@@ -2505,8 +2507,9 @@ def apply_style():
         display: block;
         width: 100%;
         height: 100%;
-        min-height: inherit;
+        min-height: 0;
         object-fit: cover;
+        object-position: 50% 50%;
         border-radius: 22px;
         filter: saturate(1.02) contrast(1.02);
     }
@@ -2743,10 +2746,11 @@ def apply_style():
                 el.setAttribute("content", content);
             }
 
-            const version = "tx-icon-v5";
+            const version = "tx-brand-v6";
             const staticBase = `${window.parent.location.origin}/app/static`;
             const manifestUrl = `${staticBase}/manifest.json?v=${version}`;
             const faviconUrl = `${staticBase}/favicon.png?v=${version}`;
+            const faviconIcoUrl = `${staticBase}/favicon.ico?v=${version}`;
             const appleIconUrl = `${staticBase}/apple-touch-icon.png?v=${version}`;
             const appleIconRawUrl = `${staticBase}/apple-touch-icon.png`;
             const applePrecomposedUrl = `${staticBase}/apple-touch-icon-precomposed.png?v=${version}`;
@@ -2778,14 +2782,19 @@ def apply_style():
             removeLinks('link[rel="apple-touch-icon"]');
             removeLinks('link[rel="apple-touch-icon-precomposed"]');
             removeLinks('link[href*="favicon"]');
+            removeLinks('link[href*="favicon.ico"]');
             removeLinks('link[href*="apple-touch-icon"]');
 
             appendLink("manifest", manifestUrl);
             appendLink("manifest", `${staticBase}/manifest.json`);
             appendLink("icon", faviconUrl, { type: "image/png", sizes: "64x64" });
             appendLink("icon", `${staticBase}/favicon.png`, { type: "image/png", sizes: "64x64" });
+            appendLink("icon", faviconIcoUrl);
+            appendLink("icon", `${staticBase}/favicon.ico`);
             appendLink("shortcut icon", faviconUrl, { type: "image/png", sizes: "64x64" });
             appendLink("shortcut icon", `${staticBase}/favicon.png`, { type: "image/png", sizes: "64x64" });
+            appendLink("shortcut icon", faviconIcoUrl);
+            appendLink("shortcut icon", `${staticBase}/favicon.ico`);
             appendLink("apple-touch-icon", appleIconUrl, { sizes: "180x180" });
             appendLink("apple-touch-icon", appleIconRawUrl, { sizes: "180x180" });
             appendLink("apple-touch-icon-precomposed", applePrecomposedUrl, { sizes: "180x180" });

@@ -97,7 +97,7 @@ def _p(text, style):
 
 
 def _logo():
-    logo_path = Path("assets/logo.png")
+    logo_path = Path("assets/branding/tx_logo_icon.png")
 
     if not logo_path.exists():
         return ""

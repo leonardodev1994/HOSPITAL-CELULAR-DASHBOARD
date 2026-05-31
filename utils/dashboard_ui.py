@@ -6,7 +6,7 @@ import streamlit as st
 
 
 CHART_COLORS = ["#E63946", "#16A34A", "#2563EB", "#F59E0B", "#64748B", "#0EA5E9"]
-LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
+LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "branding" / "tx_logo_icon.png"
 
 
 def moeda(valor):
@@ -17,7 +17,7 @@ def page_header(title, subtitle):
     logo_html = ""
     if LOGO_PATH.exists():
         logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
-        logo_html = f'<img class="dash-hero-logo" src="data:image/png;base64,{logo_base64}" alt="Hospital do Celular" />'
+        logo_html = f'<img class="dash-hero-logo" src="data:image/png;base64,{logo_base64}" alt="TX System" />'
 
     st.markdown(
         f"""

@@ -21,13 +21,13 @@ from utils.quiosques import render_quiosque_filter
 from utils.style import apply_style
 
 
-LOGO_PATH = Path("assets/logo.png")
-ICON_PATH = Path("assets/icon.png")
+LOGO_PATH = Path("assets/branding/tx_logo_icon.png")
+ICON_PATH = Path("assets/branding/tx_logo_icon.png")
 APP_VERSION = "deploy-check-2026-05-30-125b267"
 
 st.set_page_config(
     page_title="TX System",
-    page_icon="assets/icon.png" if ICON_PATH.exists() else None,
+    page_icon=str(ICON_PATH) if ICON_PATH.exists() else None,
     layout="wide",
     initial_sidebar_state="expanded",
 )

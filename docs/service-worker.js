@@ -1,10 +1,11 @@
-const CACHE_NAME = "tx-system-landing-v1";
+const CACHE_NAME = "tx-system-landing-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./app.html",
   "./manifest.json",
   "./favicon.png",
+  "./favicon.ico",
   "./apple-touch-icon.png",
   "./apple-touch-icon-precomposed.png",
   "./icon-192.png",
