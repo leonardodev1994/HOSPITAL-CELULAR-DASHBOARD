@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import bar_chart, empty_state, metric_card, moeda, page_header, pie_chart
+from utils.dashboard_ui import bar_chart, dashboard_banner, empty_state, metric_card, moeda, page_header, pie_chart
 from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause
 
@@ -20,6 +20,7 @@ def render_dashboard_geral(conn):
     else:
         df_despesas = pd.DataFrame(columns=["valor"])
 
+    dashboard_banner()
     page_header(
         "Dashboard Geral",
         "Visão consolidada do faturamento, mix de vendas e formas de pagamento.",

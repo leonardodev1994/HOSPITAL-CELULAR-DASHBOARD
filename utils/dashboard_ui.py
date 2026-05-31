@@ -7,10 +7,41 @@ import streamlit as st
 
 CHART_COLORS = ["#E63946", "#16A34A", "#2563EB", "#F59E0B", "#64748B", "#0EA5E9"]
 LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "branding" / "tx_logo_icon.png"
+DASHBOARD_BANNER_PATH = Path(__file__).resolve().parents[1] / "assets" / "branding" / "tx_dashboard_banner.webp"
 
 
 def moeda(valor):
     return f"R$ {float(valor or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _image_data_uri(path):
+    if not path.exists():
+        return ""
+
+    image_bytes = path.read_bytes()
+    if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        mime_type = "image/webp"
+    elif image_bytes.startswith(b"\x89PNG"):
+        mime_type = "image/png"
+    else:
+        mime_type = "image/jpeg"
+
+    return f"data:{mime_type};base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+
+
+def dashboard_banner():
+    banner_uri = _image_data_uri(DASHBOARD_BANNER_PATH)
+    if not banner_uri:
+        return
+
+    st.markdown(
+        f"""
+        <div class="tx-dashboard-banner">
+            <img src="{banner_uri}" alt="TX System - Gestão inteligente, resultado previsível">
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def page_header(title, subtitle):

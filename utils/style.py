@@ -2359,6 +2359,25 @@ def apply_style():
         border-left: 4px solid var(--accent-2) !important;
     }
 
+    .tx-dashboard-banner {
+        width: 100%;
+        margin: 0 0 1.15rem;
+        aspect-ratio: 3 / 2;
+        overflow: hidden;
+        border-radius: 22px;
+        border: 1px solid rgba(17, 24, 39, .10);
+        background: #050706;
+        box-shadow: 0 22px 54px rgba(17, 24, 39, .16);
+    }
+
+    .tx-dashboard-banner img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 50%;
+    }
+
     .stButton button,
     .stDownloadButton button,
     button[kind="secondary"],
@@ -2440,6 +2459,15 @@ def apply_style():
 
     hr {
         border-color: #E5E7EB !important;
+    }
+
+    @media (max-width: 768px) {
+        .tx-dashboard-banner {
+            margin-bottom: .9rem;
+            aspect-ratio: 3 / 2;
+            border-radius: 16px;
+            box-shadow: 0 14px 30px rgba(17, 24, 39, .13);
+        }
     }
     </style>
     """, unsafe_allow_html=True)
