@@ -1,13 +1,13 @@
 {
   "name": "Hospital do Celular",
-  "short_name": "Hospital Celular",
+  "short_name": "Hospital",
   "description": "Sistema de atendimento, OS, estoque e vendas do Hospital do Celular.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#050607",
-  "theme_color": "#37F29A",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/app/static/icon-192.png",

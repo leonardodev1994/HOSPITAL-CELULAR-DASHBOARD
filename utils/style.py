@@ -1745,6 +1745,298 @@ def apply_style():
     st.markdown(f"""
     <style>
     :root {{
+        --bg: #F6F7F9;
+        --bg-2: #FFFFFF;
+        --surface: #FFFFFF;
+        --surface-2: #F9FAFB;
+        --sidebar: #FFFFFF;
+        --sidebar-2: #F8FAFC;
+        --text: #111827;
+        --muted: #6B7280;
+        --border: #E5E7EB;
+        --accent: #E63946;
+        --accent-2: #16A34A;
+        --success: #16A34A;
+        --warning: #D97706;
+        --danger: #DC2626;
+        --shadow: 0 18px 50px rgba(17, 24, 39, .08);
+        --shadow-soft: 0 10px 30px rgba(17, 24, 39, .06);
+        --radius: 12px;
+    }}
+
+    .stApp {{
+        background: linear-gradient(180deg, #FFFFFF 0%, #F6F7F9 45%, #F3F4F6 100%) !important;
+        color: var(--text) !important;
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif !important;
+    }}
+
+    .stApp::before,
+    .stApp::after {{
+        display: none !important;
+        content: none !important;
+    }}
+
+    [data-testid="stHeader"] {{
+        background: rgba(255, 255, 255, .92) !important;
+        border-bottom: 1px solid #E5E7EB !important;
+        backdrop-filter: blur(14px);
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+        border-right: 1px solid #E5E7EB !important;
+        box-shadow: 12px 0 32px rgba(17, 24, 39, .05) !important;
+    }}
+
+    .stApp,
+    .stApp p,
+    .stApp span,
+    .stApp label,
+    .stApp div,
+    section[data-testid="stSidebar"] * {{
+        color: var(--text) !important;
+    }}
+
+    h1, h2, h3, h4, h5, h6 {{
+        color: var(--text) !important;
+    }}
+
+    section[data-testid="stSidebar"] img,
+    .dash-hero-logo {{
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        box-shadow: 0 14px 30px rgba(17, 24, 39, .10) !important;
+    }}
+
+    .sidebar-brand,
+    .sidebar-user,
+    .mobile-user,
+    .dash-hero,
+    .dash-card,
+    .section-panel,
+    .empty-state,
+    .client-search-title,
+    .client-search-card,
+    .os-lookup-panel,
+    .os-lookup-client,
+    [data-testid="stForm"],
+    [data-testid="stExpander"] details,
+    [data-testid="stMetric"],
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"],
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        box-shadow: var(--shadow-soft) !important;
+        backdrop-filter: none !important;
+    }}
+
+    .dash-hero {{
+        min-height: auto !important;
+        grid-template-columns: auto minmax(0, 1fr) !important;
+        border-left: 4px solid var(--accent) !important;
+        border-radius: 14px !important;
+        padding: 20px 22px !important;
+        overflow: hidden;
+    }}
+
+    .dash-hero::before,
+    .dash-hero-mark {{
+        display: none !important;
+    }}
+
+    .dash-hero-kicker {{
+        color: var(--accent-2) !important;
+        font-size: .72rem;
+        font-weight: 850;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }}
+
+    .dash-hero p,
+    .dash-card span,
+    .dash-card small,
+    .section-panel p,
+    .sidebar-brand p,
+    .sidebar-user span,
+    .sidebar-user small,
+    .mobile-user span,
+    .mobile-user small,
+    .client-search-title small,
+    .client-search-card span,
+    .client-search-card small,
+    .os-lookup-panel small,
+    .os-lookup-client span,
+    .nav-caption,
+    .nav-group,
+    .stCaptionContainer,
+    small {{
+        color: var(--muted) !important;
+    }}
+
+    .dash-card {{
+        border-radius: 14px !important;
+        border-top: 3px solid var(--card-accent, var(--accent)) !important;
+        border-left: 1px solid #E5E7EB !important;
+        min-height: 132px;
+        transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }}
+
+    .dash-card::before {{
+        display: none !important;
+    }}
+
+    .dash-card:hover {{
+        transform: translateY(-1px);
+        border-color: #D1D5DB !important;
+        box-shadow: 0 16px 36px rgba(17, 24, 39, .10) !important;
+    }}
+
+    .dash-card strong {{
+        color: #111827 !important;
+        text-shadow: none !important;
+    }}
+
+    .dash-card-top i {{
+        background: var(--card-accent, var(--accent)) !important;
+        box-shadow: none !important;
+    }}
+
+    .section-panel {{
+        border-left: 4px solid var(--accent-2) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button,
+    .stButton button,
+    .stDownloadButton button,
+    button[kind="secondary"] {{
+        background: #FFFFFF !important;
+        border: 1px solid #D1D5DB !important;
+        color: var(--text) !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button:hover,
+    .stButton button:hover,
+    .stDownloadButton button:hover {{
+        background: #F9FAFB !important;
+        border-color: var(--accent) !important;
+        box-shadow: 0 10px 24px rgba(230, 57, 70, .10) !important;
+        transform: none !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button[kind="primary"],
+    button[kind="primary"] {{
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 12px 24px rgba(230, 57, 70, .18) !important;
+    }}
+
+    button[kind="primary"] p,
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] p,
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] span {{
+        color: #FFFFFF !important;
+    }}
+
+    input,
+    textarea,
+    [data-baseweb="input"] > div,
+    [data-baseweb="textarea"] > div,
+    [data-baseweb="select"] > div {{
+        background: #FFFFFF !important;
+        border-color: #D1D5DB !important;
+        color: var(--text) !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+    }}
+
+    input::placeholder,
+    textarea::placeholder {{
+        color: #9CA3AF !important;
+    }}
+
+    [data-testid="stPlotlyChart"] {{
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        box-shadow: var(--shadow-soft) !important;
+    }}
+
+    [data-testid="stDataFrame"] [role="columnheader"] {{
+        background: #F3F4F6 !important;
+        color: #111827 !important;
+        border-color: #E5E7EB !important;
+    }}
+
+    [data-testid="stDataFrame"] [role="gridcell"] {{
+        background: #FFFFFF !important;
+        color: #111827 !important;
+        border-color: #F3F4F6 !important;
+    }}
+
+    [data-testid="stExpander"] summary {{
+        background: #FFFFFF !important;
+        color: #111827 !important;
+    }}
+
+    [data-testid="stExpander"] summary:hover {{
+        background: #F9FAFB !important;
+    }}
+
+    .status-badge {{
+        background: #F0FDF4 !important;
+        border-color: #BBF7D0 !important;
+        color: #166534 !important;
+    }}
+
+    [data-testid="collapsedControl"] button,
+    [data-testid="stSidebarCollapseButton"] button,
+    button[aria-label*="sidebar"],
+    button[aria-label*="Sidebar"],
+    button[title*="sidebar"],
+    button[title*="Sidebar"],
+    [data-testid="stBaseButton-header"],
+    [data-testid="stBaseButton-headerNoPadding"] {{
+        background: #FFFFFF !important;
+        border-color: #D1D5DB !important;
+        color: #111827 !important;
+    }}
+
+    [data-testid="collapsedControl"] svg,
+    [data-testid="stSidebarCollapseButton"] svg,
+    button[aria-label*="sidebar"] svg,
+    button[aria-label*="Sidebar"] svg,
+    button[title*="sidebar"] svg,
+    button[title*="Sidebar"] svg {{
+        stroke: #111827 !important;
+        color: #111827 !important;
+    }}
+
+    hr {{
+        border-color: #E5E7EB !important;
+    }}
+
+    @media (max-width: 768px) {{
+        .main .block-container {{
+            padding: 4.35rem .75rem 2rem !important;
+        }}
+
+        .dash-hero {{
+            grid-template-columns: 56px minmax(0, 1fr) !important;
+            padding: 16px !important;
+        }}
+
+        .dash-card {{
+            min-height: auto;
+        }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <style>
+    :root {{
         --bg: #050607;
         --bg-2: #0B0D0F;
         --surface: rgba(18, 20, 22, .74);
@@ -1913,6 +2205,229 @@ def apply_style():
     </style>
     """, unsafe_allow_html=True)
 
+    st.markdown("""
+    <style>
+    :root {
+        --bg: #F6F7F9;
+        --surface: #FFFFFF;
+        --surface-2: #F9FAFB;
+        --sidebar: #FFFFFF;
+        --sidebar-2: #F8FAFC;
+        --text: #111827;
+        --muted: #6B7280;
+        --border: #E5E7EB;
+        --accent: #E63946;
+        --accent-2: #16A34A;
+        --success: #16A34A;
+        --shadow: 0 18px 50px rgba(17, 24, 39, .08);
+        --shadow-soft: 0 10px 30px rgba(17, 24, 39, .06);
+    }
+
+    .stApp {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F6F7F9 55%, #F3F4F6 100%) !important;
+        color: var(--text) !important;
+    }
+
+    .stApp::before,
+    .stApp::after,
+    .dash-hero::before,
+    .dash-hero-mark,
+    .dash-card::before {
+        display: none !important;
+        content: none !important;
+    }
+
+    [data-testid="stHeader"] {
+        background: rgba(255, 255, 255, .94) !important;
+        border-bottom: 1px solid #E5E7EB !important;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+        border-right: 1px solid #E5E7EB !important;
+        box-shadow: 12px 0 32px rgba(17, 24, 39, .05) !important;
+    }
+
+    .stApp,
+    .stApp p,
+    .stApp span,
+    .stApp label,
+    .stApp div,
+    section[data-testid="stSidebar"] * {
+        color: var(--text) !important;
+    }
+
+    .dash-hero,
+    .dash-card,
+    .section-panel,
+    .empty-state,
+    .client-search-title,
+    .client-search-card,
+    .os-lookup-panel,
+    .os-lookup-client,
+    .sidebar-user,
+    .mobile-user,
+    [data-testid="stForm"],
+    [data-testid="stExpander"] details,
+    [data-testid="stMetric"],
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"],
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        box-shadow: var(--shadow-soft) !important;
+        backdrop-filter: none !important;
+    }
+
+    section[data-testid="stSidebar"] img,
+    .dash-hero-logo {
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        box-shadow: 0 14px 30px rgba(17, 24, 39, .10) !important;
+    }
+
+    .dash-hero {
+        min-height: auto !important;
+        grid-template-columns: auto minmax(0, 1fr) !important;
+        border-left: 4px solid var(--accent) !important;
+        border-radius: 14px !important;
+        padding: 20px 22px !important;
+    }
+
+    .dash-hero-kicker {
+        color: var(--accent-2) !important;
+    }
+
+    .dash-hero p,
+    .dash-card span,
+    .dash-card small,
+    .section-panel p,
+    .sidebar-brand p,
+    .sidebar-user span,
+    .sidebar-user small,
+    .mobile-user span,
+    .mobile-user small,
+    .client-search-title small,
+    .client-search-card span,
+    .client-search-card small,
+    .os-lookup-panel small,
+    .os-lookup-client span,
+    .nav-caption,
+    .nav-group,
+    small {
+        color: var(--muted) !important;
+    }
+
+    .dash-card {
+        border-radius: 14px !important;
+        border-top: 3px solid var(--card-accent, var(--accent)) !important;
+        min-height: 132px;
+    }
+
+    .dash-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 36px rgba(17, 24, 39, .10) !important;
+    }
+
+    .dash-card strong {
+        color: #111827 !important;
+        text-shadow: none !important;
+    }
+
+    .dash-card-top i {
+        background: var(--card-accent, var(--accent)) !important;
+        box-shadow: none !important;
+    }
+
+    .section-panel {
+        border-left: 4px solid var(--accent-2) !important;
+    }
+
+    .stButton button,
+    .stDownloadButton button,
+    button[kind="secondary"],
+    section[data-testid="stSidebar"] .stButton button {
+        background: #FFFFFF !important;
+        border: 1px solid #D1D5DB !important;
+        color: var(--text) !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+    }
+
+    .stButton button:hover,
+    .stDownloadButton button:hover,
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background: #F9FAFB !important;
+        border-color: var(--accent) !important;
+        box-shadow: 0 10px 24px rgba(230, 57, 70, .10) !important;
+        transform: none !important;
+    }
+
+    button[kind="primary"],
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 12px 24px rgba(230, 57, 70, .18) !important;
+    }
+
+    button[kind="primary"] p,
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] p,
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] span {
+        color: #FFFFFF !important;
+    }
+
+    input,
+    textarea,
+    [data-baseweb="input"] > div,
+    [data-baseweb="textarea"] > div,
+    [data-baseweb="select"] > div {
+        background: #FFFFFF !important;
+        border-color: #D1D5DB !important;
+        color: var(--text) !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+    }
+
+    [data-testid="stPlotlyChart"] {
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        box-shadow: var(--shadow-soft) !important;
+    }
+
+    [data-testid="stDataFrame"] [role="columnheader"] {
+        background: #F3F4F6 !important;
+        color: #111827 !important;
+        border-color: #E5E7EB !important;
+    }
+
+    [data-testid="stDataFrame"] [role="gridcell"] {
+        background: #FFFFFF !important;
+        color: #111827 !important;
+        border-color: #F3F4F6 !important;
+    }
+
+    [data-testid="stExpander"] summary {
+        background: #FFFFFF !important;
+        color: #111827 !important;
+    }
+
+    [data-testid="stExpander"] summary:hover {
+        background: #F9FAFB !important;
+    }
+
+    .status-badge {
+        background: #F0FDF4 !important;
+        border-color: #BBF7D0 !important;
+        color: #166534 !important;
+    }
+
+    hr {
+        border-color: #E5E7EB !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     components.html(
         """
         <script>
@@ -1942,13 +2457,15 @@ def apply_style():
             }
 
             upsertMeta("viewport", "width=device-width, initial-scale=1, viewport-fit=cover");
-            upsertMeta("theme-color", "#37F29A");
+            upsertMeta("theme-color", "#ffffff");
             upsertMeta("apple-mobile-web-app-capable", "yes");
             upsertMeta("apple-mobile-web-app-status-bar-style", "default");
             upsertMeta("apple-mobile-web-app-title", "Hospital do Celular");
 
             upsertLink("manifest", "/app/static/manifest.json");
-            upsertLink("apple-touch-icon", "/app/static/icon-192.png", { sizes: "192x192" });
+            upsertLink("icon", "/app/static/favicon.png", { type: "image/png" });
+            upsertLink("shortcut icon", "/app/static/favicon.png", { type: "image/png" });
+            upsertLink("apple-touch-icon", "/app/static/apple-touch-icon.png", { sizes: "180x180" });
 
             if ("serviceWorker" in window.parent.navigator) {
                 window.parent.navigator.serviceWorker.register("/app/static/service-worker.js").catch(function () {});
