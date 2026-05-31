@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 
-CHART_COLORS = ["#E11D2E", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#0891B2"]
+CHART_COLORS = ["#37F29A", "#15B77A", "#87F5C0", "#2DD4BF", "#94A3B8", "#D1D5DB"]
 LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
 
 
@@ -78,22 +78,22 @@ def apply_plot_style(fig, height=360):
         height=height,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font_color="#101828",
+        font_color="#E5F7EF",
         margin=dict(l=20, r=20, t=55, b=20),
         legend=dict(
             bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#475467"),
+            font=dict(color="#9CA3AF"),
         ),
-        title=dict(font=dict(size=18, color="#101828")),
+        title=dict(font=dict(size=18, color="#E5F7EF")),
         hoverlabel=dict(
-            bgcolor="#FFFFFF",
-            bordercolor="#E4E7EC",
-            font=dict(color="#101828", size=13, family="Inter, sans-serif"),
+            bgcolor="#101A16",
+            bordercolor="#2A4A3A",
+            font=dict(color="#E5F7EF", size=13, family="Inter, sans-serif"),
             align="left",
         ),
     )
-    fig.update_xaxes(gridcolor="#E4E7EC", zerolinecolor="#E4E7EC", tickfont=dict(color="#667085"))
-    fig.update_yaxes(gridcolor="#E4E7EC", zerolinecolor="#E4E7EC", tickfont=dict(color="#667085"))
+    fig.update_xaxes(gridcolor="rgba(148, 163, 184, .16)", zerolinecolor="rgba(148, 163, 184, .22)", tickfont=dict(color="#9CA3AF"))
+    fig.update_yaxes(gridcolor="rgba(148, 163, 184, .16)", zerolinecolor="rgba(148, 163, 184, .22)", tickfont=dict(color="#9CA3AF"))
     fig.update_traces(marker_line_width=0, hoverlabel_namelength=-1)
     return fig
 
@@ -110,7 +110,7 @@ def bar_chart(df, x, y, title, color=None):
         x=x,
         y=y,
         color=color,
-        template="plotly_white",
+        template="plotly_dark",
         title=title,
         color_discrete_sequence=CHART_COLORS,
         custom_data=["_hover_value"],
@@ -144,7 +144,7 @@ def pie_chart(df, names, values, title):
         names=names,
         values=values,
         hole=0.58,
-        template="plotly_white",
+        template="plotly_dark",
         title=title,
         color_discrete_sequence=CHART_COLORS,
         custom_data=["_hover_value"],

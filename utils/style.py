@@ -1,8 +1,21 @@
+import base64
+from pathlib import Path
+
 import streamlit as st
 import streamlit.components.v1 as components
 
 
+LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
+
+
+def _logo_data_uri():
+    if not LOGO_PATH.exists():
+        return ""
+    return f"data:image/png;base64,{base64.b64encode(LOGO_PATH.read_bytes()).decode('utf-8')}"
+
+
 def apply_style():
+    logo_uri = _logo_data_uri()
     st.markdown("""
     <style>
     :root {
@@ -1054,6 +1067,290 @@ def apply_style():
     </style>
     """, unsafe_allow_html=True)
 
+    st.markdown(f"""
+    <style>
+    :root {{
+        --bg: #07110D;
+        --bg-2: #0A1711;
+        --surface: rgba(12, 24, 18, .78);
+        --surface-2: rgba(16, 32, 24, .86);
+        --sidebar: rgba(6, 15, 11, .96);
+        --sidebar-2: rgba(12, 26, 19, .96);
+        --text: #E5F7EF;
+        --muted: #9CAFA6;
+        --border: rgba(93, 255, 174, .16);
+        --accent: #37F29A;
+        --accent-2: #15B77A;
+        --success: #37F29A;
+        --warning: #D7B56D;
+        --danger: #FF6B6B;
+        --shadow: 0 22px 70px rgba(0, 0, 0, .42);
+        --shadow-soft: 0 14px 38px rgba(0, 0, 0, .30);
+        --radius: 10px;
+    }}
+
+    .stApp {{
+        background:
+            radial-gradient(circle at 18% 8%, rgba(55, 242, 154, .13), transparent 34rem),
+            radial-gradient(circle at 88% 18%, rgba(21, 183, 122, .10), transparent 30rem),
+            linear-gradient(135deg, #06100C 0%, #081A12 48%, #040907 100%) !important;
+        color: var(--text) !important;
+    }}
+
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: url("{logo_uri}");
+        background-repeat: no-repeat;
+        background-position: right 7vw top 13vh;
+        background-size: min(48vw, 620px);
+        opacity: .045;
+        filter: grayscale(1) contrast(1.15);
+        z-index: 0;
+    }}
+
+    .main .block-container {{
+        position: relative;
+        z-index: 1;
+    }}
+
+    [data-testid="stHeader"] {{
+        background: rgba(5, 12, 9, .72) !important;
+        border-bottom: 1px solid rgba(55, 242, 154, .10) !important;
+        backdrop-filter: blur(16px);
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background:
+            linear-gradient(180deg, var(--sidebar) 0%, var(--sidebar-2) 100%) !important;
+        border-right: 1px solid rgba(55, 242, 154, .14) !important;
+        box-shadow: 18px 0 48px rgba(0, 0, 0, .24);
+    }}
+
+    section[data-testid="stSidebar"] img {{
+        box-shadow: 0 18px 36px rgba(0, 0, 0, .42) !important;
+        border: 1px solid rgba(55, 242, 154, .18);
+        background: rgba(255, 255, 255, .03);
+    }}
+
+    .stApp,
+    .stApp p,
+    .stApp span,
+    .stApp label,
+    .stApp div,
+    section[data-testid="stSidebar"] * {{
+        color: var(--text) !important;
+    }}
+
+    h1, h2, h3, h4, h5, h6 {{
+        color: var(--text) !important;
+    }}
+
+    .sidebar-brand,
+    .sidebar-user,
+    .mobile-user,
+    .dash-hero,
+    .dash-card,
+    .section-panel,
+    .empty-state,
+    .client-search-title,
+    .client-search-card,
+    .os-lookup-panel,
+    .os-lookup-client,
+    [data-testid="stForm"],
+    [data-testid="stExpander"] details,
+    [data-testid="stMetric"],
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"],
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background: linear-gradient(145deg, rgba(15, 31, 23, .82), rgba(8, 18, 13, .74)) !important;
+        border: 1px solid rgba(55, 242, 154, .16) !important;
+        box-shadow: var(--shadow-soft) !important;
+        backdrop-filter: blur(16px);
+    }}
+
+    .dash-hero {{
+        border-left: 4px solid var(--accent) !important;
+        padding: 22px 24px;
+    }}
+
+    .dash-hero-logo {{
+        background: rgba(255, 255, 255, .04);
+        border: 1px solid rgba(55, 242, 154, .18);
+    }}
+
+    .dash-hero p,
+    .dash-card span,
+    .dash-card small,
+    .section-panel p,
+    .sidebar-brand p,
+    .sidebar-user span,
+    .sidebar-user small,
+    .mobile-user span,
+    .mobile-user small,
+    .client-search-title small,
+    .client-search-card span,
+    .client-search-card small,
+    .os-lookup-panel small,
+    .os-lookup-client span,
+    .nav-caption,
+    .nav-group,
+    .stCaptionContainer,
+    small {{
+        color: var(--muted) !important;
+    }}
+
+    .dash-card {{
+        border-top: 1px solid rgba(55, 242, 154, .18) !important;
+        border-left: 3px solid var(--accent) !important;
+        min-height: 138px;
+    }}
+
+    .dash-card strong {{
+        color: #F4FFF9 !important;
+        text-shadow: 0 0 22px rgba(55, 242, 154, .10);
+    }}
+
+    .section-panel {{
+        border-left: 4px solid var(--accent) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button,
+    .st-key-mobile_nav div[role="radiogroup"] label {{
+        background: rgba(255, 255, 255, .03) !important;
+        border: 1px solid rgba(55, 242, 154, .10) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button:hover,
+    .stButton button:hover,
+    .stDownloadButton button:hover {{
+        background: rgba(55, 242, 154, .08) !important;
+        border-color: rgba(55, 242, 154, .42) !important;
+        box-shadow: 0 12px 28px rgba(55, 242, 154, .10) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button[kind="primary"],
+    button[kind="primary"] {{
+        background: linear-gradient(135deg, #37F29A, #15B77A) !important;
+        border-color: rgba(55, 242, 154, .65) !important;
+        color: #04120B !important;
+        box-shadow: 0 16px 34px rgba(55, 242, 154, .18) !important;
+    }}
+
+    button[kind="primary"] p,
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] p,
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] span {{
+        color: #04120B !important;
+    }}
+
+    .stButton button,
+    .stDownloadButton button,
+    button[kind="secondary"] {{
+        background: rgba(14, 30, 22, .86) !important;
+        border: 1px solid rgba(55, 242, 154, .18) !important;
+        color: var(--text) !important;
+    }}
+
+    input,
+    textarea,
+    [data-baseweb="input"] > div,
+    [data-baseweb="textarea"] > div,
+    [data-baseweb="select"] > div {{
+        background: rgba(5, 12, 9, .82) !important;
+        border-color: rgba(55, 242, 154, .18) !important;
+        color: var(--text) !important;
+    }}
+
+    input::placeholder,
+    textarea::placeholder {{
+        color: rgba(229, 247, 239, .42) !important;
+    }}
+
+    [data-testid="stDataFrame"] [role="columnheader"] {{
+        background: rgba(55, 242, 154, .10) !important;
+        color: #F4FFF9 !important;
+    }}
+
+    [data-testid="stDataFrame"] [role="gridcell"] {{
+        background: rgba(7, 17, 13, .92) !important;
+        color: var(--text) !important;
+        border-color: rgba(55, 242, 154, .08) !important;
+    }}
+
+    [data-testid="stExpander"] summary {{
+        background: rgba(55, 242, 154, .04) !important;
+    }}
+
+    [data-testid="stTabs"] button {{
+        color: var(--muted) !important;
+    }}
+
+    [data-testid="stTabs"] button[aria-selected="true"] {{
+        color: var(--accent) !important;
+        border-color: var(--accent) !important;
+    }}
+
+    [data-testid="collapsedControl"] button,
+    [data-testid="stSidebarCollapseButton"] button,
+    button[aria-label*="sidebar"],
+    button[aria-label*="Sidebar"],
+    button[title*="sidebar"],
+    button[title*="Sidebar"],
+    [data-testid="stBaseButton-header"],
+    [data-testid="stBaseButton-headerNoPadding"] {{
+        background: rgba(8, 18, 13, .92) !important;
+        border-color: rgba(55, 242, 154, .22) !important;
+        color: var(--text) !important;
+    }}
+
+    [data-testid="collapsedControl"] svg,
+    [data-testid="stSidebarCollapseButton"] svg,
+    button[aria-label*="sidebar"] svg,
+    button[aria-label*="Sidebar"] svg,
+    button[title*="sidebar"] svg,
+    button[title*="Sidebar"] svg {{
+        stroke: var(--accent) !important;
+        color: var(--accent) !important;
+    }}
+
+    .status-badge {{
+        background: rgba(55, 242, 154, .08) !important;
+        border-color: rgba(55, 242, 154, .28) !important;
+        color: var(--accent) !important;
+    }}
+
+    hr {{
+        border-color: rgba(55, 242, 154, .12) !important;
+    }}
+
+    @media (max-width: 768px) {{
+        .stApp::before {{
+            background-position: center 6rem;
+            background-size: 92vw;
+            opacity: .028;
+        }}
+
+        .main .block-container {{
+            padding: 4.35rem .75rem 2rem !important;
+        }}
+
+        .dash-hero,
+        .dash-card,
+        .section-panel,
+        [data-testid="stForm"],
+        [data-testid="stExpander"] details {{
+            border-radius: 10px !important;
+        }}
+
+        .dash-card {{
+            min-height: auto;
+        }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
     components.html(
         """
         <script>
@@ -1083,7 +1380,7 @@ def apply_style():
             }
 
             upsertMeta("viewport", "width=device-width, initial-scale=1, viewport-fit=cover");
-            upsertMeta("theme-color", "#E63946");
+            upsertMeta("theme-color", "#37F29A");
             upsertMeta("apple-mobile-web-app-capable", "yes");
             upsertMeta("apple-mobile-web-app-status-bar-style", "default");
             upsertMeta("apple-mobile-web-app-title", "Hospital do Celular");

@@ -3,8 +3,8 @@ headless = true
 enableStaticServing = true
 
 [theme]
-base = "light"
-primaryColor = "#E63946"
-backgroundColor = "#F5F7FA"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#101828"
+base = "dark"
+primaryColor = "#37F29A"
+backgroundColor = "#07110D"
+secondaryBackgroundColor = "#101A16"
+textColor = "#E5F7EF"
