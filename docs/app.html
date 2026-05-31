@@ -102,20 +102,13 @@
       line-height: 1.5;
     }
 
-    .loader {
-      width: 44px;
-      height: 44px;
-      margin: 24px auto 18px;
-      border: 3px solid rgba(255, 255, 255, 0.16);
-      border-top-color: var(--green);
-      border-radius: 999px;
-      animation: spin 0.9s linear infinite;
+    .actions {
+      margin-top: 26px;
     }
 
     button {
       width: 100%;
-      min-height: 52px;
-      margin-top: 8px;
+      min-height: 58px;
       appearance: none;
       border: 1px solid rgba(53, 208, 111, 0.36);
       border-radius: 16px;
@@ -125,18 +118,19 @@
       cursor: pointer;
       font: inherit;
       font-weight: 750;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    }
+
+    button:active {
+      transform: translateY(1px) scale(0.99);
+      filter: brightness(0.96);
+      box-shadow: 0 8px 22px rgba(53, 208, 111, 0.14);
     }
 
     .hint {
       margin-top: 14px;
       font-size: 0.78rem;
       color: rgba(246, 248, 247, 0.58);
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
     }
 
     @media (max-width: 420px) {
@@ -157,17 +151,17 @@
     <img class="logo" src="./apple-touch-icon.png?v=tx-landing-v1" alt="TX System">
     <h1>TX System</h1>
     <p>Hospital do Celular</p>
-    <div class="loader" aria-hidden="true"></div>
-    <button id="openApp" type="button">Abrir sistema</button>
-    <p class="hint">Carregando o painel seguro...</p>
+    <div class="actions">
+      <button id="openApp" type="button">Abrir Sistema</button>
+    </div>
+    <p class="hint">Adicione esta página à Tela de Início para manter o ícone TX.</p>
   </main>
 
   <script>
     const STREAMLIT_APP_URL = "https://hospital-celular-dashboard.streamlit.app/";
-    const REDIRECT_DELAY_MS = 1200;
 
     function openSystem() {
-      window.location.replace(STREAMLIT_APP_URL);
+      window.open(STREAMLIT_APP_URL, "_blank", "noopener,noreferrer");
     }
 
     if ("serviceWorker" in navigator) {
@@ -175,7 +169,6 @@
     }
 
     document.getElementById("openApp").addEventListener("click", openSystem);
-    window.setTimeout(openSystem, REDIRECT_DELAY_MS);
   </script>
 </body>
 </html>
