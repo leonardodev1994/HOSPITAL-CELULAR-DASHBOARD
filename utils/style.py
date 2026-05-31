@@ -16,6 +16,21 @@ def _logo_data_uri():
 
 def apply_style():
     logo_uri = _logo_data_uri()
+    st.markdown(
+        """
+        <link rel="manifest" href="/app/static/manifest.json?v=tx-icon-v4">
+        <link rel="icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v4">
+        <link rel="shortcut icon" type="image/png" sizes="64x64" href="/app/static/favicon.png?v=tx-icon-v4">
+        <link rel="apple-touch-icon" sizes="180x180" href="/app/static/apple-touch-icon.png?v=tx-icon-v4">
+        <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/app/static/apple-touch-icon-precomposed.png?v=tx-icon-v4">
+        <meta name="theme-color" content="#ffffff">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="TX System">
+        """,
+        unsafe_allow_html=True,
+    )
     st.markdown("""
     <style>
     :root {
@@ -2445,11 +2460,14 @@ def apply_style():
                 el.setAttribute("content", content);
             }
 
-            const version = "tx-icon-v3";
+            const version = "tx-icon-v4";
             const staticBase = `${window.parent.location.origin}/app/static`;
             const manifestUrl = `${staticBase}/manifest.json?v=${version}`;
             const faviconUrl = `${staticBase}/favicon.png?v=${version}`;
             const appleIconUrl = `${staticBase}/apple-touch-icon.png?v=${version}`;
+            const appleIconRawUrl = `${staticBase}/apple-touch-icon.png`;
+            const applePrecomposedUrl = `${staticBase}/apple-touch-icon-precomposed.png?v=${version}`;
+            const applePrecomposedRawUrl = `${staticBase}/apple-touch-icon-precomposed.png`;
 
             function removeLinks(selector) {
                 head.querySelectorAll(selector).forEach((el) => el.remove());
@@ -2480,10 +2498,15 @@ def apply_style():
             removeLinks('link[href*="apple-touch-icon"]');
 
             appendLink("manifest", manifestUrl);
+            appendLink("manifest", `${staticBase}/manifest.json`);
             appendLink("icon", faviconUrl, { type: "image/png", sizes: "64x64" });
+            appendLink("icon", `${staticBase}/favicon.png`, { type: "image/png", sizes: "64x64" });
             appendLink("shortcut icon", faviconUrl, { type: "image/png", sizes: "64x64" });
+            appendLink("shortcut icon", `${staticBase}/favicon.png`, { type: "image/png", sizes: "64x64" });
             appendLink("apple-touch-icon", appleIconUrl, { sizes: "180x180" });
-            appendLink("apple-touch-icon-precomposed", appleIconUrl, { sizes: "180x180" });
+            appendLink("apple-touch-icon", appleIconRawUrl, { sizes: "180x180" });
+            appendLink("apple-touch-icon-precomposed", applePrecomposedUrl, { sizes: "180x180" });
+            appendLink("apple-touch-icon-precomposed", applePrecomposedRawUrl, { sizes: "180x180" });
 
             if ("serviceWorker" in window.parent.navigator) {
                 window.parent.navigator.serviceWorker.getRegistrations().then(function (registrations) {
