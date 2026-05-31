@@ -22,6 +22,7 @@ from utils.style import apply_style
 
 
 LOGO_PATH = Path("assets/logo.png")
+APP_VERSION = "deploy-check-2026-05-30-125b267"
 
 st.set_page_config(
     page_title="Hospital do Celular",
@@ -109,6 +110,7 @@ def render_mobile_navigation(user, auto_backup):
                     <span>Usuário ativo</span>
                     <strong>{user['nome']}</strong>
                     <small>{user['perfil']}</small>
+                    <small>Versão: {APP_VERSION}</small>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -145,6 +147,7 @@ def render_sidebar_navigation(user, auto_backup):
             <span>Usuário ativo</span>
             <strong>{user['nome']}</strong>
             <small>{user['perfil']}</small>
+            <small>Versão: {APP_VERSION}</small>
         </div>
         """,
         unsafe_allow_html=True,
