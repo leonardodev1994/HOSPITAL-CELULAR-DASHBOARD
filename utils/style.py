@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 def apply_style():
@@ -859,5 +860,243 @@ def apply_style():
             height: 62px;
         }
     }
+
+    @media (max-width: 768px) {
+        :root {
+            --bg: #F8FAFC;
+            --shadow: 0 10px 26px rgba(16, 24, 40, .06);
+            --shadow-soft: 0 5px 16px rgba(16, 24, 40, .05);
+        }
+
+        html,
+        body,
+        .stApp {
+            max-width: 100%;
+            overflow-x: hidden !important;
+        }
+
+        .stApp {
+            background:
+                linear-gradient(rgba(248, 250, 252, .94), rgba(248, 250, 252, .96)),
+                var(--bg);
+        }
+
+        .main .block-container {
+            max-width: 100%;
+            padding: 4.5rem .72rem 2rem !important;
+        }
+
+        section[data-testid="stSidebar"] {
+            width: min(86vw, 330px) !important;
+            min-width: min(86vw, 330px) !important;
+            box-shadow: 12px 0 30px rgba(16, 24, 40, .12);
+        }
+
+        .st-key-mobile_nav {
+            display: block !important;
+            position: sticky;
+            top: 3.55rem;
+            z-index: 9999;
+            margin: 0 0 .85rem;
+        }
+
+        .dash-hero {
+            grid-template-columns: 1fr;
+            gap: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            border-left-width: 3px;
+        }
+
+        .dash-hero h1 {
+            font-size: 1.28rem !important;
+            line-height: 1.18;
+        }
+
+        .dash-hero p {
+            font-size: .84rem;
+        }
+
+        .dash-hero-logo {
+            width: 50px;
+            height: 50px;
+        }
+
+        .dash-card {
+            min-height: auto;
+            padding: 13px 14px;
+            margin-bottom: 8px;
+        }
+
+        .dash-card strong {
+            font-size: 1.34rem;
+        }
+
+        .section-panel,
+        [data-testid="stForm"] {
+            padding: 13px;
+            box-shadow: var(--shadow-soft);
+        }
+
+        [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+        }
+
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: .5rem !important;
+        }
+
+        [data-testid="stMetric"] {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            box-shadow: var(--shadow-soft);
+        }
+
+        [data-testid="stDataFrame"] {
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            box-shadow: none;
+        }
+
+        [data-testid="stTable"] {
+            max-width: 100% !important;
+            overflow-x: auto !important;
+        }
+
+        .stButton button,
+        .stDownloadButton button,
+        button[kind="primary"],
+        button[kind="secondary"] {
+            width: 100% !important;
+            min-height: 48px !important;
+            padding: 10px 13px !important;
+            font-size: .96rem !important;
+        }
+
+        input,
+        textarea,
+        [data-baseweb="input"] > div,
+        [data-baseweb="textarea"] > div,
+        [data-baseweb="select"] > div {
+            min-height: 46px;
+            font-size: 16px !important;
+        }
+
+        textarea {
+            min-height: 92px !important;
+        }
+
+        [data-testid="stExpander"] details {
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-soft);
+        }
+
+        [data-testid="stExpander"] summary {
+            min-height: 48px;
+            padding: 12px 13px !important;
+            font-weight: 820;
+        }
+
+        [data-testid="stTabs"] button {
+            min-height: 44px;
+            padding: 8px 10px;
+        }
+
+        .os-lookup-panel,
+        .os-lookup-client,
+        .client-search-title,
+        .client-search-card {
+            grid-template-columns: 1fr;
+            padding: 12px;
+            margin-bottom: 9px;
+        }
+
+        .os-card {
+            display: block;
+            padding: 12px;
+        }
+
+        .status-badge {
+            margin-top: 8px;
+            white-space: normal;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        canvas {
+            max-width: 100% !important;
+        }
+
+        iframe {
+            max-width: 100% !important;
+        }
+
+        h1 { font-size: 1.42rem !important; }
+        h2 { font-size: 1.2rem !important; }
+        h3 { font-size: 1.05rem !important; }
+
+        .login-shell {
+            margin: 5vh .25rem 1rem;
+            padding: 18px;
+        }
+    }
     </style>
     """, unsafe_allow_html=True)
+
+    components.html(
+        """
+        <script>
+        (function () {
+            const doc = window.parent.document;
+            const head = doc.head || doc.getElementsByTagName("head")[0];
+
+            function upsertMeta(name, content) {
+                let el = head.querySelector(`meta[name="${name}"]`);
+                if (!el) {
+                    el = doc.createElement("meta");
+                    el.setAttribute("name", name);
+                    head.appendChild(el);
+                }
+                el.setAttribute("content", content);
+            }
+
+            function upsertLink(rel, href, extra) {
+                let el = head.querySelector(`link[rel="${rel}"][href="${href}"]`);
+                if (!el) {
+                    el = doc.createElement("link");
+                    el.setAttribute("rel", rel);
+                    el.setAttribute("href", href);
+                    head.appendChild(el);
+                }
+                Object.entries(extra || {}).forEach(([key, value]) => el.setAttribute(key, value));
+            }
+
+            upsertMeta("viewport", "width=device-width, initial-scale=1, viewport-fit=cover");
+            upsertMeta("theme-color", "#E63946");
+            upsertMeta("apple-mobile-web-app-capable", "yes");
+            upsertMeta("apple-mobile-web-app-status-bar-style", "default");
+            upsertMeta("apple-mobile-web-app-title", "Hospital do Celular");
+
+            upsertLink("manifest", "/app/static/manifest.json");
+            upsertLink("apple-touch-icon", "/app/static/icon-192.png", { sizes: "192x192" });
+
+            if ("serviceWorker" in window.parent.navigator) {
+                window.parent.navigator.serviceWorker.register("/app/static/service-worker.js").catch(function () {});
+            }
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
