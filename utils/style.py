@@ -1351,6 +1351,397 @@ def apply_style():
     </style>
     """, unsafe_allow_html=True)
 
+    st.markdown(f"""
+    <style>
+    :root {{
+        --tx-bg: #030806;
+        --tx-panel: rgba(10, 22, 16, .58);
+        --tx-panel-strong: rgba(13, 30, 22, .76);
+        --tx-line: rgba(82, 255, 169, .18);
+        --tx-line-strong: rgba(82, 255, 169, .34);
+        --tx-glow: rgba(55, 242, 154, .22);
+        --tx-text: #F2FFF8;
+        --tx-muted: #9FB7AB;
+        --tx-shadow: 0 24px 80px rgba(0, 0, 0, .48);
+        --tx-shadow-soft: 0 14px 40px rgba(0, 0, 0, .34);
+        --tx-radius: 18px;
+    }}
+
+    .stApp {{
+        background:
+            linear-gradient(115deg, rgba(3, 8, 6, .98), rgba(5, 18, 12, .97) 44%, rgba(1, 5, 4, .99)),
+            repeating-linear-gradient(90deg, rgba(82, 255, 169, .035) 0 1px, transparent 1px 92px),
+            repeating-linear-gradient(0deg, rgba(82, 255, 169, .026) 0 1px, transparent 1px 92px) !important;
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif !important;
+    }}
+
+    .stApp::before {{
+        background-image:
+            linear-gradient(90deg, rgba(3, 8, 6, .18), rgba(3, 8, 6, .62)),
+            url("{logo_uri}");
+        background-size: min(58vw, 760px);
+        background-position: right -6vw top 6vh;
+        opacity: .16;
+        filter: saturate(.9) contrast(1.05);
+        mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .72) 42%, rgba(0, 0, 0, .18) 100%);
+    }}
+
+    .stApp::after {{
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(180deg, rgba(255,255,255,.028), transparent 22rem),
+            repeating-linear-gradient(135deg, rgba(255,255,255,.022) 0 1px, transparent 1px 7px);
+        opacity: .36;
+        mix-blend-mode: screen;
+        z-index: 0;
+    }}
+
+    .main .block-container {{
+        max-width: 1480px;
+        padding-top: 1.65rem;
+    }}
+
+    [data-testid="stHeader"] {{
+        background: linear-gradient(180deg, rgba(2, 8, 5, .86), rgba(2, 8, 5, .42)) !important;
+        border-bottom: 1px solid rgba(82, 255, 169, .08) !important;
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background:
+            linear-gradient(180deg, rgba(3, 10, 7, .98), rgba(5, 18, 12, .96)),
+            repeating-linear-gradient(0deg, rgba(82, 255, 169, .035) 0 1px, transparent 1px 48px) !important;
+        border-right: 1px solid rgba(82, 255, 169, .16) !important;
+        box-shadow: 24px 0 80px rgba(0, 0, 0, .42);
+    }}
+
+    section[data-testid="stSidebar"] > div {{
+        padding: 20px 14px;
+    }}
+
+    section[data-testid="stSidebar"] img {{
+        width: 164px !important;
+        border-radius: 22px !important;
+        padding: 8px;
+        background:
+            linear-gradient(145deg, rgba(82, 255, 169, .12), rgba(255,255,255,.03)) !important;
+        border: 1px solid rgba(82, 255, 169, .22) !important;
+        box-shadow: 0 22px 50px rgba(0,0,0,.46), 0 0 42px rgba(55,242,154,.10) !important;
+    }}
+
+    .sidebar-brand {{
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        padding: 2px 4px 14px;
+    }}
+
+    .sidebar-brand h2 {{
+        font-size: 1.06rem !important;
+        letter-spacing: .02em;
+    }}
+
+    .sidebar-user,
+    .mobile-user {{
+        border-radius: 16px !important;
+        background: linear-gradient(145deg, rgba(14, 33, 24, .72), rgba(8, 18, 13, .52)) !important;
+        border: 1px solid rgba(82, 255, 169, .16) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 14px 34px rgba(0,0,0,.28) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button {{
+        min-height: 46px;
+        border-radius: 14px !important;
+        background: rgba(255,255,255,.026) !important;
+        border: 1px solid transparent !important;
+        box-shadow: none !important;
+        transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button:hover {{
+        transform: translateX(3px);
+        background: rgba(82, 255, 169, .075) !important;
+        border-color: rgba(82, 255, 169, .22) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px rgba(0,0,0,.22) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button[kind="primary"] {{
+        background:
+            linear-gradient(135deg, rgba(55,242,154,.98), rgba(20,183,122,.88)) !important;
+        color: #03110B !important;
+        border-color: rgba(180,255,218,.44) !important;
+        box-shadow: 0 16px 38px rgba(55,242,154,.18), inset 0 1px 0 rgba(255,255,255,.35) !important;
+    }}
+
+    .dash-hero {{
+        position: relative;
+        min-height: 168px;
+        align-items: end;
+        grid-template-columns: 88px minmax(0, 1fr);
+        border-radius: 24px !important;
+        border: 1px solid rgba(82, 255, 169, .20) !important;
+        background:
+            linear-gradient(135deg, rgba(16, 38, 27, .76), rgba(4, 13, 9, .70)),
+            linear-gradient(90deg, rgba(82, 255, 169, .10), transparent 48%) !important;
+        box-shadow: var(--tx-shadow), inset 0 1px 0 rgba(255,255,255,.08) !important;
+        overflow: hidden;
+        padding: 24px 28px !important;
+    }}
+
+    .dash-hero::before {{
+        content: "";
+        position: absolute;
+        inset: 1px;
+        border-radius: 23px;
+        background:
+            linear-gradient(120deg, rgba(255,255,255,.10), transparent 28%),
+            repeating-linear-gradient(90deg, rgba(82,255,169,.038) 0 1px, transparent 1px 54px);
+        pointer-events: none;
+    }}
+
+    .dash-hero-mark {{
+        position: absolute;
+        right: 24px;
+        top: 10px;
+        color: rgba(82, 255, 169, .055) !important;
+        font-size: clamp(4rem, 10vw, 8.2rem);
+        line-height: 1;
+        font-weight: 950;
+        letter-spacing: .03em;
+        pointer-events: none;
+    }}
+
+    .dash-hero-logo {{
+        width: 72px;
+        height: 72px;
+        border-radius: 18px !important;
+        padding: 4px;
+        background: rgba(255,255,255,.04) !important;
+        border: 1px solid rgba(82,255,169,.24) !important;
+        box-shadow: 0 20px 44px rgba(0,0,0,.40), 0 0 28px rgba(55,242,154,.10) !important;
+        z-index: 1;
+    }}
+
+    .dash-hero > div:not(.dash-hero-mark) {{
+        z-index: 1;
+    }}
+
+    .dash-hero-kicker {{
+        display: inline-flex;
+        margin-bottom: 8px;
+        color: #7DFFC0 !important;
+        font-size: .72rem;
+        font-weight: 850;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+    }}
+
+    .dash-hero h1 {{
+        font-size: clamp(1.8rem, 3vw, 2.6rem) !important;
+        line-height: 1.04;
+        font-weight: 900 !important;
+        letter-spacing: 0;
+    }}
+
+    .dash-hero p {{
+        max-width: 760px;
+        font-size: .98rem;
+        color: rgba(229,247,239,.72) !important;
+    }}
+
+    .dash-card,
+    .section-panel,
+    [data-testid="stForm"],
+    [data-testid="stExpander"] details,
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"],
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        position: relative;
+        border-radius: var(--tx-radius) !important;
+        background:
+            linear-gradient(145deg, rgba(16, 38, 27, .62), rgba(6, 15, 10, .52)) !important;
+        border: 1px solid rgba(82, 255, 169, .15) !important;
+        box-shadow: var(--tx-shadow-soft), inset 0 1px 0 rgba(255,255,255,.06) !important;
+        backdrop-filter: blur(22px) saturate(1.2);
+    }}
+
+    .dash-card {{
+        min-height: 150px;
+        padding: 18px 18px 17px;
+        overflow: hidden;
+        border-left: 0 !important;
+        border-top: 0 !important;
+        transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }}
+
+    .dash-card::before {{
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-top: 1px solid color-mix(in srgb, var(--card-accent, #37F29A) 70%, transparent);
+        background:
+            linear-gradient(110deg, color-mix(in srgb, var(--card-accent, #37F29A) 14%, transparent), transparent 34%),
+            linear-gradient(180deg, rgba(255,255,255,.06), transparent 42%);
+        opacity: .86;
+        pointer-events: none;
+    }}
+
+    .dash-card:hover {{
+        transform: translateY(-2px);
+        border-color: color-mix(in srgb, var(--card-accent, #37F29A) 34%, transparent) !important;
+        box-shadow: 0 22px 58px rgba(0,0,0,.42), 0 0 34px color-mix(in srgb, var(--card-accent, #37F29A) 16%, transparent) !important;
+    }}
+
+    .dash-card-top {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+        z-index: 1;
+    }}
+
+    .dash-card-top i {{
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--card-accent, #37F29A);
+        box-shadow: 0 0 18px var(--card-accent, #37F29A);
+    }}
+
+    .dash-card span {{
+        color: rgba(229,247,239,.62) !important;
+        font-size: .72rem;
+        letter-spacing: .11em;
+    }}
+
+    .dash-card strong {{
+        position: relative;
+        z-index: 1;
+        font-size: clamp(1.58rem, 2.4vw, 2.05rem);
+        margin-top: 18px;
+    }}
+
+    .dash-card small {{
+        position: relative;
+        z-index: 1;
+        color: rgba(229,247,239,.58) !important;
+    }}
+
+    .section-panel {{
+        padding: 18px 20px;
+        border-left: 1px solid rgba(82,255,169,.16) !important;
+    }}
+
+    [data-testid="stPlotlyChart"] {{
+        border-radius: 20px;
+        overflow: hidden;
+        background: linear-gradient(145deg, rgba(16, 38, 27, .38), rgba(4, 13, 9, .34));
+        border: 1px solid rgba(82,255,169,.10);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 38px rgba(0,0,0,.28);
+        padding: 8px;
+    }}
+
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"] {{
+        border-radius: 18px !important;
+        overflow: hidden;
+    }}
+
+    [data-testid="stDataFrame"] [role="columnheader"] {{
+        background: rgba(82,255,169,.095) !important;
+        border-color: rgba(82,255,169,.08) !important;
+    }}
+
+    [data-testid="stDataFrame"] [role="gridcell"] {{
+        background: rgba(5,13,9,.70) !important;
+    }}
+
+    .stButton button,
+    .stDownloadButton button,
+    button[kind="secondary"] {{
+        border-radius: 14px !important;
+        transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+    }}
+
+    .stButton button:hover,
+    .stDownloadButton button:hover {{
+        transform: translateY(-1px);
+    }}
+
+    input,
+    textarea,
+    [data-baseweb="input"] > div,
+    [data-baseweb="textarea"] > div,
+    [data-baseweb="select"] > div {{
+        border-radius: 14px !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    }}
+
+    [data-testid="stExpander"] summary {{
+        border-radius: 17px !important;
+        background: linear-gradient(90deg, rgba(82,255,169,.065), rgba(255,255,255,.015)) !important;
+        transition: background .18s ease;
+    }}
+
+    [data-testid="stExpander"] summary:hover {{
+        background: linear-gradient(90deg, rgba(82,255,169,.10), rgba(255,255,255,.025)) !important;
+    }}
+
+    @media (max-width: 768px) {{
+        .stApp::before {{
+            background-size: 135vw;
+            background-position: center 5.2rem;
+            opacity: .09;
+            mask-image: linear-gradient(180deg, rgba(0,0,0,.55), transparent 74%);
+        }}
+
+        .stApp::after {{
+            opacity: .24;
+        }}
+
+        .main .block-container {{
+            padding: 4.25rem .78rem 2rem !important;
+        }}
+
+        .dash-hero {{
+            min-height: 150px;
+            grid-template-columns: 56px minmax(0, 1fr);
+            padding: 18px !important;
+            border-radius: 20px !important;
+        }}
+
+        .dash-hero-logo {{
+            width: 54px;
+            height: 54px;
+            border-radius: 15px !important;
+        }}
+
+        .dash-hero-mark {{
+            font-size: 5rem;
+            right: 12px;
+            top: 18px;
+        }}
+
+        .dash-hero-kicker {{
+            font-size: .62rem;
+            letter-spacing: .08em;
+        }}
+
+        .dash-card {{
+            min-height: 126px;
+            padding: 16px;
+            border-radius: 18px !important;
+        }}
+
+        section[data-testid="stSidebar"] {{
+            width: min(88vw, 340px) !important;
+        }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
     components.html(
         """
         <script>

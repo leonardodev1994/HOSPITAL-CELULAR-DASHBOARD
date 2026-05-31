@@ -22,8 +22,10 @@ def page_header(title, subtitle):
     st.markdown(
         f"""
         <div class="dash-hero">
+            <div class="dash-hero-mark">TX</div>
             {logo_html}
             <div>
+                <span class="dash-hero-kicker">Tecnologia urbana para gestão inteligente</span>
                 <h1>{title}</h1>
                 <p>{subtitle}</p>
             </div>
@@ -36,8 +38,11 @@ def page_header(title, subtitle):
 def metric_card(label, value, detail="", accent="#E11D2E"):
     st.markdown(
         f"""
-        <div class="dash-card" style="border-top-color:{accent};">
-            <span>{label}</span>
+        <div class="dash-card" style="--card-accent:{accent};">
+            <div class="dash-card-top">
+                <span>{label}</span>
+                <i></i>
+            </div>
             <strong>{value}</strong>
             <small>{detail}</small>
         </div>
