@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 
-CHART_COLORS = ["#37F29A", "#15B77A", "#87F5C0", "#2DD4BF", "#94A3B8", "#D1D5DB"]
+CHART_COLORS = ["#37F29A", "#22C55E", "#64748B", "#94A3B8", "#2DD4BF", "#D1D5DB"]
 LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
 
 

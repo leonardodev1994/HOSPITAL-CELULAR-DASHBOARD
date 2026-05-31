@@ -1742,6 +1742,177 @@ def apply_style():
     </style>
     """, unsafe_allow_html=True)
 
+    st.markdown(f"""
+    <style>
+    :root {{
+        --bg: #050607;
+        --bg-2: #0B0D0F;
+        --surface: rgba(18, 20, 22, .74);
+        --surface-2: rgba(24, 27, 30, .82);
+        --sidebar: rgba(5, 6, 7, .98);
+        --sidebar-2: rgba(13, 15, 17, .96);
+        --text: #F4F7F5;
+        --muted: #A4AAA7;
+        --border: rgba(255, 255, 255, .09);
+        --tx-panel: rgba(18, 20, 22, .64);
+        --tx-panel-strong: rgba(24, 27, 30, .78);
+        --tx-line: rgba(255, 255, 255, .09);
+        --tx-line-strong: rgba(55, 242, 154, .16);
+        --tx-glow: rgba(55, 242, 154, .08);
+    }}
+
+    .stApp {{
+        background:
+            radial-gradient(circle at 10% 0%, rgba(255, 255, 255, .055), transparent 30rem),
+            radial-gradient(circle at 92% 8%, rgba(55, 242, 154, .028), transparent 28rem),
+            linear-gradient(115deg, #050607 0%, #0B0D0F 46%, #030404 100%) !important;
+    }}
+
+    .stApp::before {{
+        background-image:
+            linear-gradient(90deg, rgba(5, 6, 7, .24), rgba(5, 6, 7, .80)),
+            url("{logo_uri}") !important;
+        background-size: min(48vw, 660px) !important;
+        background-position: right -8vw top 9vh !important;
+        opacity: .048 !important;
+        filter: grayscale(.3) saturate(.48) contrast(1.08) !important;
+        mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .42) 46%, rgba(0, 0, 0, .07) 100%) !important;
+    }}
+
+    .stApp::after {{
+        background:
+            linear-gradient(180deg, rgba(255,255,255,.03), transparent 17rem),
+            repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0 1px, transparent 1px 10px) !important;
+        opacity: .22 !important;
+    }}
+
+    [data-testid="stHeader"] {{
+        background: linear-gradient(180deg, rgba(5, 6, 7, .88), rgba(5, 6, 7, .44)) !important;
+        border-bottom-color: rgba(255, 255, 255, .07) !important;
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background:
+            linear-gradient(180deg, rgba(5, 6, 7, .98), rgba(13, 15, 17, .96)),
+            repeating-linear-gradient(0deg, rgba(255, 255, 255, .016) 0 1px, transparent 1px 54px) !important;
+        border-right-color: rgba(255, 255, 255, .085) !important;
+    }}
+
+    section[data-testid="stSidebar"] img {{
+        background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)) !important;
+        border-color: rgba(255, 255, 255, .12) !important;
+        box-shadow: 0 22px 50px rgba(0,0,0,.46), 0 0 18px rgba(55,242,154,.04) !important;
+    }}
+
+    .sidebar-user,
+    .mobile-user,
+    .dash-hero,
+    .dash-card,
+    .section-panel,
+    .empty-state,
+    .client-search-title,
+    .client-search-card,
+    .os-lookup-panel,
+    .os-lookup-client,
+    [data-testid="stForm"],
+    [data-testid="stExpander"] details,
+    [data-testid="stMetric"],
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"],
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background: linear-gradient(145deg, rgba(24, 27, 30, .66), rgba(8, 9, 11, .58)) !important;
+        border-color: rgba(255, 255, 255, .09) !important;
+        box-shadow: 0 18px 52px rgba(0, 0, 0, .38), inset 0 1px 0 rgba(255,255,255,.055) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button:hover {{
+        background: rgba(255, 255, 255, .055) !important;
+        border-color: rgba(55, 242, 154, .16) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px rgba(0,0,0,.22) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button[kind="primary"],
+    button[kind="primary"] {{
+        background: linear-gradient(135deg, rgba(55,242,154,.88), rgba(34,197,94,.78)) !important;
+        border-color: rgba(180,255,218,.28) !important;
+        box-shadow: 0 14px 30px rgba(55,242,154,.10), inset 0 1px 0 rgba(255,255,255,.28) !important;
+    }}
+
+    .dash-hero {{
+        border-color: rgba(255, 255, 255, .10) !important;
+        background:
+            linear-gradient(135deg, rgba(24, 27, 30, .74), rgba(7, 8, 10, .72)),
+            linear-gradient(90deg, rgba(55, 242, 154, .026), transparent 48%) !important;
+    }}
+
+    .dash-hero::before {{
+        background:
+            linear-gradient(120deg, rgba(255,255,255,.08), transparent 30%),
+            repeating-linear-gradient(90deg, rgba(255,255,255,.016) 0 1px, transparent 1px 58px) !important;
+    }}
+
+    .dash-hero-mark {{
+        color: rgba(255, 255, 255, .04) !important;
+    }}
+
+    .dash-hero-logo {{
+        border-color: rgba(255,255,255,.12) !important;
+        box-shadow: 0 20px 44px rgba(0,0,0,.40), 0 0 16px rgba(55,242,154,.035) !important;
+    }}
+
+    .dash-hero-kicker {{
+        color: #8FEABD !important;
+    }}
+
+    .dash-card::before {{
+        border-top-color: color-mix(in srgb, var(--card-accent, #37F29A) 24%, transparent) !important;
+        background:
+            linear-gradient(110deg, color-mix(in srgb, var(--card-accent, #37F29A) 4%, transparent), transparent 34%),
+            linear-gradient(180deg, rgba(255,255,255,.05), transparent 42%) !important;
+        opacity: .68 !important;
+    }}
+
+    .dash-card:hover {{
+        border-color: color-mix(in srgb, var(--card-accent, #37F29A) 18%, rgba(255,255,255,.08)) !important;
+        box-shadow: 0 22px 58px rgba(0,0,0,.44), 0 0 18px color-mix(in srgb, var(--card-accent, #37F29A) 5%, transparent) !important;
+    }}
+
+    .dash-card-top i {{
+        box-shadow: 0 0 9px color-mix(in srgb, var(--card-accent, #37F29A) 42%, transparent) !important;
+    }}
+
+    [data-testid="stPlotlyChart"] {{
+        background: linear-gradient(145deg, rgba(24, 27, 30, .42), rgba(6, 7, 8, .36)) !important;
+        border-color: rgba(255,255,255,.07) !important;
+    }}
+
+    [data-testid="stDataFrame"] [role="columnheader"] {{
+        background: rgba(255,255,255,.055) !important;
+        border-color: rgba(255,255,255,.06) !important;
+    }}
+
+    [data-testid="stDataFrame"] [role="gridcell"] {{
+        background: rgba(7,8,10,.74) !important;
+    }}
+
+    [data-testid="stExpander"] summary {{
+        background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(255,255,255,.014)) !important;
+    }}
+
+    [data-testid="stExpander"] summary:hover {{
+        background: linear-gradient(90deg, rgba(255,255,255,.065), rgba(55,242,154,.025)) !important;
+    }}
+
+    @media (max-width: 768px) {{
+        .stApp::before {{
+            opacity: .034 !important;
+            background-size: 130vw !important;
+            mask-image: linear-gradient(180deg, rgba(0,0,0,.34), transparent 72%) !important;
+        }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
     components.html(
         """
         <script>
