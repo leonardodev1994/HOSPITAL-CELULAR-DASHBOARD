@@ -18,31 +18,38 @@ def render_dashboard_geral(conn):
         else " WHERE " + status_filter
     )
     where_pagamentos, params_pagamentos = scope_clause("pagamentos", prefix="AND")
-    df = pd.read_sql_query(
-        f"SELECT id, tipo, descricao, valor FROM lancamentos{where_lancamentos}",
+    df_resumo = pd.read_sql_query(
+        f"""
+        SELECT tipo, COALESCE(SUM(valor), 0) AS valor, COUNT(*) AS quantidade
+        FROM lancamentos
+        {where_lancamentos}
+        GROUP BY tipo
+        """,
         conn,
         params=params_lancamentos,
     )
     df_pagamentos = pd.read_sql_query(
         f"""
-        SELECT pagamentos.forma_pagamento, pagamentos.valor
+        SELECT pagamentos.forma_pagamento, COALESCE(SUM(pagamentos.valor), 0) AS valor
         FROM pagamentos
         INNER JOIN lancamentos ON lancamentos.id = pagamentos.lancamento_id
         WHERE COALESCE(lancamentos.status, 'Ativo') <> 'Cancelado'
         {where_pagamentos}
+        GROUP BY pagamentos.forma_pagamento
         """,
         conn,
         params=params_pagamentos,
     )
     if has_permission("view_profit"):
         where_despesas, params_despesas = scope_clause()
-        df_despesas = pd.read_sql_query(
-            f"SELECT valor FROM despesas{where_despesas}",
+        despesas_row = pd.read_sql_query(
+            f"SELECT COALESCE(SUM(valor), 0) AS total FROM despesas{where_despesas}",
             conn,
             params=params_despesas,
         )
+        despesas = float(despesas_row.iloc[0]["total"] or 0) if not despesas_row.empty else 0
     else:
-        df_despesas = pd.DataFrame(columns=["valor"])
+        despesas = 0
 
     page_banner("tx_dashboard_banner.webp", "TX System - Dashboard Geral")
     page_header(
@@ -50,12 +57,11 @@ def render_dashboard_geral(conn):
         "Visão consolidada do faturamento, mix de vendas e formas de pagamento.",
     )
 
-    faturamento = df["valor"].sum() if not df.empty else 0
-    despesas = df_despesas["valor"].sum() if not df_despesas.empty else 0
+    faturamento = df_resumo["valor"].sum() if not df_resumo.empty else 0
     lucro = faturamento - despesas
 
-    servicos = df[df["tipo"] == "Serviço"]["valor"].sum() if not df.empty else 0
-    produtos = df[df["tipo"] == "Produto"]["valor"].sum() if not df.empty else 0
+    servicos = df_resumo[df_resumo["tipo"] == "Serviço"]["valor"].sum() if not df_resumo.empty else 0
+    produtos = df_resumo[df_resumo["tipo"] == "Produto"]["valor"].sum() if not df_resumo.empty else 0
 
     cols = st.columns(4 if has_permission("view_profit") else 3)
     c1, c2, c3 = cols[:3]
@@ -77,29 +83,33 @@ def render_dashboard_geral(conn):
         if df_pagamentos.empty:
             empty_state("Nenhum pagamento cadastrado ainda.")
         else:
-            resumo_pag = df_pagamentos.groupby("forma_pagamento", as_index=False)["valor"].sum()
             st.plotly_chart(
-                pie_chart(resumo_pag, "forma_pagamento", "valor", "Formas de pagamento"),
+                pie_chart(df_pagamentos, "forma_pagamento", "valor", "Formas de pagamento"),
                 width="stretch",
             )
 
     with col2:
-        if df.empty:
+        if df_resumo.empty:
             empty_state("Nenhum lançamento cadastrado ainda.")
         else:
-            resumo = df.groupby("tipo", as_index=False)["valor"].sum()
             st.plotly_chart(
-                bar_chart(resumo, "tipo", "valor", "Serviços x Produtos"),
+                bar_chart(df_resumo, "tipo", "valor", "Serviços x Produtos"),
                 width="stretch",
             )
 
-    if not df.empty:
+    if not df_resumo.empty:
         st.divider()
-        top = (
-            df.groupby("descricao", as_index=False)
-            .agg(valor=("valor", "sum"), quantidade=("id", "count"))
-            .sort_values("valor", ascending=False)
-            .head(8)
+        top = pd.read_sql_query(
+            f"""
+            SELECT descricao, COALESCE(SUM(valor), 0) AS valor, COUNT(*) AS quantidade
+            FROM lancamentos
+            {where_lancamentos}
+            GROUP BY descricao
+            ORDER BY valor DESC
+            LIMIT 8
+            """,
+            conn,
+            params=params_lancamentos,
         )
         st.subheader("Itens mais relevantes")
         st.dataframe(

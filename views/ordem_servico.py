@@ -215,7 +215,7 @@ def _render_cliente_search(df_clientes, key_prefix, on_select, selected_id=None)
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _load_ordens_servico(conn):
+def _load_ordens_servico(conn, limit=300):
     scope, params = scope_clause()
     return pd.read_sql_query("""
     SELECT
@@ -233,7 +233,8 @@ def _load_ordens_servico(conn):
     FROM ordens_servico
     """ + scope + """
     ORDER BY id DESC
-    """, conn, params=params)
+    LIMIT ?
+    """, conn, params=params + (limit,))
 
 
 def _load_ordens_por_cliente(conn, cliente):

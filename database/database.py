@@ -105,6 +105,7 @@ MIGRATIONS = [
     ("0005_preco_alterado_venda", "_migration_0005_preco_alterado_venda"),
     ("0006_estoque_planilha", "_migration_0006_estoque_planilha"),
     ("0007_cancelamento_vendas", "_migration_0007_cancelamento_vendas"),
+    ("0008_indices_performance", "_migration_0008_indices_performance"),
 ]
 
 
@@ -227,6 +228,10 @@ def _migration_0007_cancelamento_vendas(conn):
         return
 
     _create_sqlite_sales_cancel_schema(conn)
+
+
+def _migration_0008_indices_performance(conn):
+    _create_performance_indexes(conn)
 
 
 def ensure_quiosques_schema(conn):
@@ -926,6 +931,30 @@ def _create_postgres_sales_cancel_schema(conn):
     cursor.execute("UPDATE venda_itens SET status = 'Ativo' WHERE status IS NULL OR status = ''")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_lancamentos_status_data ON lancamentos(status, data)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_lancamentos_cancelado_em ON lancamentos(cancelado_em)")
+
+
+def _create_performance_indexes(conn):
+    cursor = conn.cursor()
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        cursor.execute("SET LOCAL lock_timeout = '5s'")
+
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_lancamentos_quiosque_status_data ON lancamentos(quiosque_id, status, data)",
+        "CREATE INDEX IF NOT EXISTS idx_lancamentos_quiosque_data_id ON lancamentos(quiosque_id, data, id)",
+        "CREATE INDEX IF NOT EXISTS idx_lancamentos_venda_id ON lancamentos(venda_id)",
+        "CREATE INDEX IF NOT EXISTS idx_pagamentos_lancamento ON pagamentos(lancamento_id)",
+        "CREATE INDEX IF NOT EXISTS idx_pagamentos_quiosque ON pagamentos(quiosque_id)",
+        "CREATE INDEX IF NOT EXISTS idx_vendas_quiosque_status_data ON vendas(quiosque_id, status, data)",
+        "CREATE INDEX IF NOT EXISTS idx_venda_itens_lancamento ON venda_itens(lancamento_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ordens_quiosque_status_id ON ordens_servico(quiosque_id, status, id)",
+        "CREATE INDEX IF NOT EXISTS idx_ordens_cliente_busca ON ordens_servico(quiosque_id, cliente, telefone, cpf)",
+        "CREATE INDEX IF NOT EXISTS idx_clientes_quiosque_ativo_nome ON clientes(quiosque_id, ativo, nome)",
+        "CREATE INDEX IF NOT EXISTS idx_estoque_quiosque_ativo_produto ON estoque(quiosque_id, ativo, categoria, produto)",
+        "CREATE INDEX IF NOT EXISTS idx_despesas_quiosque_data ON despesas(quiosque_id, data)",
+        "CREATE INDEX IF NOT EXISTS idx_caixa_quiosque_data ON caixa(quiosque_id, data)",
+    ]
+    for query in indexes:
+        cursor.execute(query)
 
 
 def _seed_quiosques(cursor):

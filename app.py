@@ -35,16 +35,25 @@ st.set_page_config(
 apply_style()
 
 
+@st.cache_resource(show_spinner=False)
 def ensure_database_initialized():
     migration_conn = init_db()
     try:
         initialize_database(migration_conn)
     finally:
         migration_conn.close()
+    return True
 
 
 ensure_database_initialized()
-conn = init_db()
+
+
+@st.cache_resource(show_spinner=False)
+def get_app_connection():
+    return init_db()
+
+
+conn = get_app_connection()
 
 if not require_login(conn):
     st.stop()

@@ -2,6 +2,7 @@ from datetime import datetime
 from io import BytesIO
 
 import pandas as pd
+import streamlit as st
 
 from database.database import execute_insert_returning_id
 from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
@@ -385,6 +386,7 @@ def load_stock(conn, only_active=True):
     return pd.read_sql_query(query, conn, params=params)
 
 
+@st.cache_data(show_spinner=False, ttl=120)
 def export_stock_to_excel(df_stock):
     export = df_stock.copy()
     if export.empty:
@@ -422,6 +424,7 @@ def export_stock_to_excel(df_stock):
     return output.getvalue()
 
 
+@st.cache_data(show_spinner=False)
 def import_template_excel():
     sample = pd.DataFrame([{
         "Código/SKU": "SKU-001",
