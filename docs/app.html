@@ -13,11 +13,11 @@
 
   <title>TX System</title>
 
-  <link rel="manifest" href="./manifest.json?v=tx-brand-v6">
-  <link rel="icon" type="image/png" sizes="64x64" href="./favicon.png?v=tx-brand-v6">
-  <link rel="icon" href="./favicon.ico?v=tx-brand-v6">
-  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=tx-brand-v6">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./apple-touch-icon-precomposed.png?v=tx-brand-v6">
+  <link rel="manifest" href="./manifest.json?v=tx-icon-v6">
+  <link rel="icon" type="image/png" sizes="64x64" href="./favicon.png?v=tx-icon-v6">
+  <link rel="icon" href="./favicon.ico?v=tx-icon-v6">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=tx-icon-v6">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./apple-touch-icon-precomposed.png?v=tx-icon-v6">
 
   <style>
     :root {
@@ -59,7 +59,7 @@
       width: min(82vw, 620px);
       aspect-ratio: 1;
       content: "";
-      background: url("./icon-512.png?v=tx-brand-v6") center / contain no-repeat;
+      background: url("./icon-512.png?v=tx-icon-v6") center / contain no-repeat;
       filter: blur(1px);
       opacity: 0.045;
       pointer-events: none;
@@ -149,11 +149,11 @@
 </head>
 <body>
   <main>
-    <img class="logo" src="./apple-touch-icon.png?v=tx-brand-v6" alt="TX System">
+    <img class="logo" src="./apple-touch-icon.png?v=tx-icon-v6" alt="TX System">
     <h1>TX System</h1>
     <p>Hospital do Celular</p>
     <div class="actions">
-      <button id="openApp" type="button">Abrir Sistema</button>
+      <button id="openApp" type="button">Entrar no sistema</button>
     </div>
     <p class="hint">Adicione esta página à Tela de Início para manter o ícone TX.</p>
   </main>
@@ -166,7 +166,7 @@
     }
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./service-worker.js?v=tx-brand-v6").catch(() => {});
+      navigator.serviceWorker.register("./service-worker.js?v=tx-icon-v6").catch(() => {});
     }
 
     document.getElementById("openApp").addEventListener("click", openSystem);

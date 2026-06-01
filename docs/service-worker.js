@@ -1,4 +1,4 @@
-const CACHE_NAME = "tx-system-landing-v6";
+const CACHE_NAME = "tx-system-landing-icon-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
