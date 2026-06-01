@@ -15,7 +15,9 @@ LOGIN_BANNER_PATH = BRANDING_DIR / "tx_login_banner.webp"
 LOGIN_LOGO_PATH = BRANDING_DIR / "tx_logo_icon.png"
 
 
-def _image_data_uri(path):
+@st.cache_data(show_spinner=False)
+def _image_data_uri_cached(path_str, mtime_ns):
+    path = Path(path_str)
     if not path.exists():
         return ""
 
@@ -33,6 +35,12 @@ def _image_data_uri(path):
 
     encoded = base64.b64encode(image_bytes).decode("utf-8")
     return f"data:{mime_type};base64,{encoded}"
+
+
+def _image_data_uri(path):
+    if not path.exists():
+        return ""
+    return _image_data_uri_cached(str(path), path.stat().st_mtime_ns)
 
 
 def hash_password(password, salt=None):
@@ -89,7 +97,16 @@ def ensure_default_admin(conn):
 
 def get_user_by_username(conn, username):
     users = pd.read_sql_query("""
-    SELECT *
+    SELECT
+        id,
+        nome,
+        usuario,
+        senha_hash,
+        senha_salt,
+        perfil,
+        ativo,
+        quiosque_id,
+        acesso_todos_quiosques
     FROM usuarios
     WHERE usuario = ?
     LIMIT 1
@@ -151,7 +168,7 @@ def require_login(conn):
             st.markdown(
                 f"""
                 <div class="tx-login-art">
-                    <img src="{banner_uri}" alt="Tecnologia urbana para gestao inteligente">
+                    <img src="{banner_uri}" alt="Tecnologia urbana para gestao inteligente" loading="eager" decoding="async">
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -171,7 +188,7 @@ def require_login(conn):
         st.markdown(
             f"""
             <div class="tx-login-brand">
-                {'<img src="' + logo_uri + '" alt="TX System">' if logo_uri else '<strong>TX</strong>'}
+                {'<img src="' + logo_uri + '" alt="TX System" loading="eager" decoding="async">' if logo_uri else '<strong>TX</strong>'}
                 <div>
                     <h1>TX System</h1>
                     <p>Gestao inteligente, resultado previsivel.</p>

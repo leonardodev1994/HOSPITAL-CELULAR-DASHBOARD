@@ -14,7 +14,9 @@ def moeda(valor):
     return f"R$ {float(valor or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def _image_data_uri(path):
+@st.cache_data(show_spinner=False)
+def _image_data_uri_cached(path_str, mtime_ns):
+    path = Path(path_str)
     if not path.exists():
         return ""
 
@@ -29,6 +31,12 @@ def _image_data_uri(path):
     return f"data:{mime_type};base64,{base64.b64encode(image_bytes).decode('utf-8')}"
 
 
+def _image_data_uri(path):
+    if not path.exists():
+        return ""
+    return _image_data_uri_cached(str(path), path.stat().st_mtime_ns)
+
+
 def page_banner(filename, alt="TX System"):
     banner_uri = _image_data_uri(BRANDING_DIR / filename)
     if not banner_uri:
@@ -37,7 +45,7 @@ def page_banner(filename, alt="TX System"):
     st.markdown(
         f"""
         <div class="tx-page-banner">
-            <img src="{banner_uri}" alt="{alt}">
+            <img src="{banner_uri}" alt="{alt}" loading="lazy" decoding="async">
         </div>
         """,
         unsafe_allow_html=True,
@@ -54,8 +62,8 @@ def dashboard_banner():
 def page_header(title, subtitle):
     logo_html = ""
     if LOGO_PATH.exists():
-        logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
-        logo_html = f'<img class="dash-hero-logo" src="data:image/png;base64,{logo_base64}" alt="TX System" />'
+        logo_uri = _image_data_uri(LOGO_PATH)
+        logo_html = f'<img class="dash-hero-logo" src="{logo_uri}" alt="TX System" loading="lazy" decoding="async" />'
 
     st.markdown(
         f"""
@@ -134,6 +142,7 @@ def apply_plot_style(fig, height=360):
             font=dict(color="#111827", size=13, family="Inter, sans-serif"),
             align="left",
         ),
+        transition_duration=0,
     )
     fig.update_xaxes(gridcolor="#E5E7EB", zerolinecolor="#E5E7EB", tickfont=dict(color="#6B7280"))
     fig.update_yaxes(gridcolor="#E5E7EB", zerolinecolor="#E5E7EB", tickfont=dict(color="#6B7280"))

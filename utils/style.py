@@ -8,10 +8,18 @@ import streamlit.components.v1 as components
 LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "branding" / "tx_logo_icon.png"
 
 
+@st.cache_data(show_spinner=False)
+def _logo_data_uri_cached(path_str, mtime_ns):
+    path = Path(path_str)
+    if not path.exists():
+        return ""
+    return f"data:image/png;base64,{base64.b64encode(path.read_bytes()).decode('utf-8')}"
+
+
 def _logo_data_uri():
     if not LOGO_PATH.exists():
         return ""
-    return f"data:image/png;base64,{base64.b64encode(LOGO_PATH.read_bytes()).decode('utf-8')}"
+    return _logo_data_uri_cached(str(LOGO_PATH), LOGO_PATH.stat().st_mtime_ns)
 
 
 def apply_style():

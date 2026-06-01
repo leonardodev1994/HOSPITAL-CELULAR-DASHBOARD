@@ -54,5 +54,9 @@ def render_despesas(conn):
                 st.session_state["despesa_salvando"] = False
 
     where_despesas, params_despesas = scope_clause()
-    df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+    df_despesas = pd.read_sql_query(
+        f"SELECT id, data, descricao, valor FROM despesas{where_despesas}",
+        conn,
+        params=params_despesas,
+    )
     st.dataframe(df_despesas, width="stretch")

@@ -29,7 +29,7 @@ def render_caixa_diario(conn):
 
     if st.button("Abrir Caixa"):
         caixa_existente = cursor.execute("""
-        SELECT * FROM caixa
+        SELECT id FROM caixa
         WHERE data = ? AND quiosque_id = ?
         """, (hoje, current_quiosque_id())).fetchone()
 
@@ -48,10 +48,18 @@ def render_caixa_diario(conn):
     where_caixa, params_caixa = scope_clause()
     if has_permission("view_expenses"):
         where_despesas, params_despesas = scope_clause()
-        df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+        df_despesas = pd.read_sql_query(
+            f"SELECT data, valor FROM despesas{where_despesas}",
+            conn,
+            params=params_despesas,
+        )
     else:
         df_despesas = pd.DataFrame(columns=["data", "valor"])
-    df_caixa = pd.read_sql_query(f"SELECT * FROM caixa{where_caixa}", conn, params=params_caixa)
+    df_caixa = pd.read_sql_query(
+        f"SELECT data, valor_inicial FROM caixa{where_caixa}",
+        conn,
+        params=params_caixa,
+    )
 
     despesas_hoje = df_despesas[df_despesas["data"] == hoje]
     caixa_hoje = df_caixa[df_caixa["data"] == hoje]

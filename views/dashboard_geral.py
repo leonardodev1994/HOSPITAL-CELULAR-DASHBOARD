@@ -12,11 +12,23 @@ def render_dashboard_geral(conn):
 
     where_lancamentos, params_lancamentos = scope_clause()
     where_pagamentos, params_pagamentos = scope_clause("pagamentos")
-    df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
-    df_pagamentos = pd.read_sql_query(f"SELECT * FROM pagamentos{where_pagamentos}", conn, params=params_pagamentos)
+    df = pd.read_sql_query(
+        f"SELECT id, tipo, descricao, valor FROM lancamentos{where_lancamentos}",
+        conn,
+        params=params_lancamentos,
+    )
+    df_pagamentos = pd.read_sql_query(
+        f"SELECT forma_pagamento, valor FROM pagamentos{where_pagamentos}",
+        conn,
+        params=params_pagamentos,
+    )
     if has_permission("view_profit"):
         where_despesas, params_despesas = scope_clause()
-        df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+        df_despesas = pd.read_sql_query(
+            f"SELECT valor FROM despesas{where_despesas}",
+            conn,
+            params=params_despesas,
+        )
     else:
         df_despesas = pd.DataFrame(columns=["valor"])
 

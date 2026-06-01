@@ -1,5 +1,4 @@
 import streamlit as st
-from PIL import Image
 from pathlib import Path
 
 from database.database import init_db, initialize_database
@@ -130,8 +129,7 @@ def render_mobile_navigation(user, auto_backup):
 
 def render_sidebar_navigation(user, auto_backup):
     if LOGO_PATH.exists():
-        logo = Image.open(LOGO_PATH)
-        st.sidebar.image(logo, width=178)
+        st.sidebar.image(str(LOGO_PATH), width=178)
 
     st.sidebar.markdown(
         """

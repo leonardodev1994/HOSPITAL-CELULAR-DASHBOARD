@@ -41,10 +41,18 @@ def render_dashboard_mensal(conn):
         return
 
     where_lancamentos, params_lancamentos = scope_clause()
-    df = pd.read_sql_query(f"SELECT * FROM lancamentos{where_lancamentos}", conn, params=params_lancamentos)
+    df = pd.read_sql_query(
+        f"SELECT id, data, tipo, descricao, valor FROM lancamentos{where_lancamentos}",
+        conn,
+        params=params_lancamentos,
+    )
     if has_permission("view_profit"):
         where_despesas, params_despesas = scope_clause()
-        df_despesas = pd.read_sql_query(f"SELECT * FROM despesas{where_despesas}", conn, params=params_despesas)
+        df_despesas = pd.read_sql_query(
+            f"SELECT data, valor FROM despesas{where_despesas}",
+            conn,
+            params=params_despesas,
+        )
     else:
         df_despesas = pd.DataFrame(columns=["data", "valor"])
 
