@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+from utils.dashboard_ui import page_banner
 from utils.permissions import require_permission
 from utils.quiosques import current_quiosque_id, scope_clause
 
@@ -15,6 +16,7 @@ def render_despesas(conn):
     st.session_state.setdefault("despesa_form_aberto", False)
     st.session_state.setdefault("despesa_salvando", False)
 
+    page_banner("tx_despesas_banner.webp", "TX System - Despesas")
     st.subheader("💸 Nova Despesa")
 
     if not st.session_state["despesa_form_aberto"]:

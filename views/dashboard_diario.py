@@ -8,6 +8,7 @@ from utils.dashboard_ui import (
     empty_state,
     metric_card,
     moeda,
+    page_banner,
     page_header,
     pie_chart,
 )
@@ -220,6 +221,7 @@ def render_dashboard_diario(conn):
     data_filtro = selected_date.strftime("%Y-%m-%d")
     data_anterior = (selected_date - timedelta(days=1)).strftime("%Y-%m-%d")
 
+    page_banner("tx_dashboard_diario_banner.webp", "TX System - Dashboard Diário")
     page_header(
         "Dashboard Diário",
         f"Análise operacional de {selected_date.strftime('%d/%m/%Y')}",
