@@ -15,6 +15,7 @@ def _pagamentos_do_dia(conn, data):
     FROM pagamentos
     INNER JOIN lancamentos ON lancamentos.id = pagamentos.lancamento_id
     WHERE lancamentos.data = ?
+      AND COALESCE(lancamentos.status, 'Ativo') <> 'Cancelado'
     """ + scope, conn, params=scoped_params(data))
 
 

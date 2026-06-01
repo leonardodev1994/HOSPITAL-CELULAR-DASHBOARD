@@ -104,6 +104,7 @@ MIGRATIONS = [
     ("0004_os_history_notifications", "_migration_0004_os_history_notifications"),
     ("0005_preco_alterado_venda", "_migration_0005_preco_alterado_venda"),
     ("0006_estoque_planilha", "_migration_0006_estoque_planilha"),
+    ("0007_cancelamento_vendas", "_migration_0007_cancelamento_vendas"),
 ]
 
 
@@ -220,6 +221,14 @@ def _migration_0006_estoque_planilha(conn):
     _create_sqlite_stock_spreadsheet_schema(conn)
 
 
+def _migration_0007_cancelamento_vendas(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_sales_cancel_schema(conn)
+        return
+
+    _create_sqlite_sales_cancel_schema(conn)
+
+
 def ensure_quiosques_schema(conn):
     if getattr(conn, "backend", "sqlite") == "postgres":
         _create_postgres_quiosque_schema(conn)
@@ -237,7 +246,18 @@ def _create_sqlite_schema(conn):
         data TEXT,
         tipo TEXT,
         descricao TEXT,
-        valor REAL
+        valor REAL,
+        status TEXT DEFAULT 'Ativo',
+        cancelado_em TEXT,
+        cancelado_por_id INTEGER,
+        cancelado_por_nome TEXT,
+        cancelado_por_perfil TEXT,
+        cancelado_motivo TEXT,
+        alterado_em TEXT,
+        alterado_por_id INTEGER,
+        alterado_por_nome TEXT,
+        alterado_por_perfil TEXT,
+        alterado_motivo TEXT
     )
     """)
 
@@ -258,7 +278,12 @@ def _create_sqlite_schema(conn):
         status TEXT DEFAULT 'Ativa',
         usuario_id INTEGER,
         usuario_nome TEXT,
-        criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        cancelado_em TEXT,
+        cancelado_por_id INTEGER,
+        cancelado_por_nome TEXT,
+        cancelado_por_perfil TEXT,
+        cancelado_motivo TEXT
     )
     """)
 
@@ -272,7 +297,8 @@ def _create_sqlite_schema(conn):
         produto_id INTEGER,
         quantidade REAL,
         valor_unitario REAL,
-        valor_total REAL
+        valor_total REAL,
+        status TEXT DEFAULT 'Ativo'
     )
     """)
 
@@ -451,7 +477,18 @@ def _create_postgres_schema(conn):
         produto_id INTEGER,
         quantidade DOUBLE PRECISION,
         venda_id INTEGER,
-        venda_item_id INTEGER
+        venda_item_id INTEGER,
+        status TEXT DEFAULT 'Ativo',
+        cancelado_em TIMESTAMP,
+        cancelado_por_id INTEGER,
+        cancelado_por_nome TEXT,
+        cancelado_por_perfil TEXT,
+        cancelado_motivo TEXT,
+        alterado_em TIMESTAMP,
+        alterado_por_id INTEGER,
+        alterado_por_nome TEXT,
+        alterado_por_perfil TEXT,
+        alterado_motivo TEXT
     )
     """)
 
@@ -472,7 +509,12 @@ def _create_postgres_schema(conn):
         status TEXT DEFAULT 'Ativa',
         usuario_id INTEGER,
         usuario_nome TEXT,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        cancelado_em TIMESTAMP,
+        cancelado_por_id INTEGER,
+        cancelado_por_nome TEXT,
+        cancelado_por_perfil TEXT,
+        cancelado_motivo TEXT
     )
     """)
 
@@ -486,7 +528,8 @@ def _create_postgres_schema(conn):
         produto_id INTEGER,
         quantidade DOUBLE PRECISION,
         valor_unitario DOUBLE PRECISION,
-        valor_total DOUBLE PRECISION
+        valor_total DOUBLE PRECISION,
+        status TEXT DEFAULT 'Ativo'
     )
     """)
 
@@ -814,6 +857,75 @@ def _create_postgres_stock_spreadsheet_schema(conn):
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_codigo_quiosque ON estoque(codigo, quiosque_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_importacoes_quiosque ON estoque_importacoes(quiosque_id)")
+
+
+def _create_sqlite_sales_cancel_schema(conn):
+    cursor = conn.cursor()
+    for column, column_type in [
+        ("status", "TEXT DEFAULT 'Ativo'"),
+        ("cancelado_em", "TEXT"),
+        ("cancelado_por_id", "INTEGER"),
+        ("cancelado_por_nome", "TEXT"),
+        ("cancelado_por_perfil", "TEXT"),
+        ("cancelado_motivo", "TEXT"),
+        ("alterado_em", "TEXT"),
+        ("alterado_por_id", "INTEGER"),
+        ("alterado_por_nome", "TEXT"),
+        ("alterado_por_perfil", "TEXT"),
+        ("alterado_motivo", "TEXT"),
+    ]:
+        _add_column_if_missing(cursor, "lancamentos", column, column_type)
+
+    for column, column_type in [
+        ("cancelado_em", "TEXT"),
+        ("cancelado_por_id", "INTEGER"),
+        ("cancelado_por_nome", "TEXT"),
+        ("cancelado_por_perfil", "TEXT"),
+        ("cancelado_motivo", "TEXT"),
+    ]:
+        _add_column_if_missing(cursor, "vendas", column, column_type)
+
+    _add_column_if_missing(cursor, "venda_itens", "status", "TEXT DEFAULT 'Ativo'")
+    cursor.execute("UPDATE lancamentos SET status = 'Ativo' WHERE status IS NULL OR status = ''")
+    cursor.execute("UPDATE vendas SET status = 'Ativa' WHERE status IS NULL OR status = ''")
+    cursor.execute("UPDATE venda_itens SET status = 'Ativo' WHERE status IS NULL OR status = ''")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_lancamentos_status_data ON lancamentos(status, data)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_lancamentos_cancelado_em ON lancamentos(cancelado_em)")
+
+
+def _create_postgres_sales_cancel_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    for column, column_type in [
+        ("status", "TEXT DEFAULT 'Ativo'"),
+        ("cancelado_em", "TIMESTAMP"),
+        ("cancelado_por_id", "INTEGER"),
+        ("cancelado_por_nome", "TEXT"),
+        ("cancelado_por_perfil", "TEXT"),
+        ("cancelado_motivo", "TEXT"),
+        ("alterado_em", "TIMESTAMP"),
+        ("alterado_por_id", "INTEGER"),
+        ("alterado_por_nome", "TEXT"),
+        ("alterado_por_perfil", "TEXT"),
+        ("alterado_motivo", "TEXT"),
+    ]:
+        _add_postgres_column_if_missing(cursor, "lancamentos", column, column_type)
+
+    for column, column_type in [
+        ("cancelado_em", "TIMESTAMP"),
+        ("cancelado_por_id", "INTEGER"),
+        ("cancelado_por_nome", "TEXT"),
+        ("cancelado_por_perfil", "TEXT"),
+        ("cancelado_motivo", "TEXT"),
+    ]:
+        _add_postgres_column_if_missing(cursor, "vendas", column, column_type)
+
+    _add_postgres_column_if_missing(cursor, "venda_itens", "status", "TEXT DEFAULT 'Ativo'")
+    cursor.execute("UPDATE lancamentos SET status = 'Ativo' WHERE status IS NULL OR status = ''")
+    cursor.execute("UPDATE vendas SET status = 'Ativa' WHERE status IS NULL OR status = ''")
+    cursor.execute("UPDATE venda_itens SET status = 'Ativo' WHERE status IS NULL OR status = ''")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_lancamentos_status_data ON lancamentos(status, data)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_lancamentos_cancelado_em ON lancamentos(cancelado_em)")
 
 
 def _seed_quiosques(cursor):

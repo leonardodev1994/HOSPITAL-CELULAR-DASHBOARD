@@ -11,6 +11,7 @@ from views.dashboard_geral import render_dashboard_geral
 from views.dashboard_mensal import render_dashboard_mensal
 from views.despesas import render_despesas
 from views.estoque import render_estoque
+from views.lancamentos_cancelados import render_lancamentos_cancelados
 from views.novo_lancamento import render_novo_lancamento
 from views.ordem_servico import render_ordem_servico
 from views.usuarios import render_usuarios
@@ -58,6 +59,7 @@ MENU_ITEMS = {
     "Clientes": render_clientes,
     "Estoque": render_estoque,
     "Novo Lançamento": render_novo_lancamento,
+    "Lançamentos Cancelados": render_lancamentos_cancelados,
     "Caixa Diário": render_caixa_diario,
     "Despesas": render_despesas,
     "Ordem de Serviço": render_ordem_servico,
@@ -68,7 +70,7 @@ MENU_ITEMS = {
 MENU_GROUPS = {
     "Análise": ["Dashboard Geral", "Dashboard Diário", "Dashboard Mensal"],
     "Operação": ["Clientes", "Estoque", "Novo Lançamento", "Ordem de Serviço"],
-    "Financeiro": ["Caixa Diário", "Despesas"],
+    "Financeiro": ["Caixa Diário", "Lançamentos Cancelados", "Despesas"],
     "Sistema": ["Usuários/Funcionários", "Backup"],
 }
 
@@ -79,6 +81,7 @@ MENU_ICONS = {
     "Clientes": ":material/groups:",
     "Estoque": ":material/inventory_2:",
     "Novo Lançamento": ":material/point_of_sale:",
+    "Lançamentos Cancelados": ":material/cancel:",
     "Caixa Diário": ":material/account_balance_wallet:",
     "Despesas": ":material/trending_down:",
     "Ordem de Serviço": ":material/build:",

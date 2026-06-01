@@ -11,14 +11,26 @@ def render_dashboard_geral(conn):
         return
 
     where_lancamentos, params_lancamentos = scope_clause()
-    where_pagamentos, params_pagamentos = scope_clause("pagamentos")
+    status_filter = "COALESCE(status, 'Ativo') <> 'Cancelado'"
+    where_lancamentos = (
+        where_lancamentos + " AND " + status_filter
+        if where_lancamentos
+        else " WHERE " + status_filter
+    )
+    where_pagamentos, params_pagamentos = scope_clause("pagamentos", prefix="AND")
     df = pd.read_sql_query(
         f"SELECT id, tipo, descricao, valor FROM lancamentos{where_lancamentos}",
         conn,
         params=params_lancamentos,
     )
     df_pagamentos = pd.read_sql_query(
-        f"SELECT forma_pagamento, valor FROM pagamentos{where_pagamentos}",
+        f"""
+        SELECT pagamentos.forma_pagamento, pagamentos.valor
+        FROM pagamentos
+        INNER JOIN lancamentos ON lancamentos.id = pagamentos.lancamento_id
+        WHERE COALESCE(lancamentos.status, 'Ativo') <> 'Cancelado'
+        {where_pagamentos}
+        """,
         conn,
         params=params_pagamentos,
     )

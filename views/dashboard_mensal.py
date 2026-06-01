@@ -41,6 +41,12 @@ def render_dashboard_mensal(conn):
         return
 
     where_lancamentos, params_lancamentos = scope_clause()
+    status_filter = "COALESCE(status, 'Ativo') <> 'Cancelado'"
+    where_lancamentos = (
+        where_lancamentos + " AND " + status_filter
+        if where_lancamentos
+        else " WHERE " + status_filter
+    )
     df = pd.read_sql_query(
         f"SELECT id, data, tipo, descricao, valor FROM lancamentos{where_lancamentos}",
         conn,

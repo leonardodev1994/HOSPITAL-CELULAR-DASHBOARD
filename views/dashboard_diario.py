@@ -37,6 +37,7 @@ def _pagamentos_do_dia(conn, data):
     FROM pagamentos
     INNER JOIN lancamentos ON lancamentos.id = pagamentos.lancamento_id
     WHERE lancamentos.data = ?
+      AND COALESCE(lancamentos.status, 'Ativo') <> 'Cancelado'
     """ + scope, conn, params=scoped_params(data))
 
 
@@ -204,6 +205,12 @@ def _render_tabela_operacional(df_lancamentos, df_pagamentos, tipo, titulo, acce
 
 def render_dashboard_diario(conn):
     where_lancamentos, params_lancamentos = scope_clause()
+    status_filter = "COALESCE(status, 'Ativo') <> 'Cancelado'"
+    where_lancamentos = (
+        where_lancamentos + " AND " + status_filter
+        if where_lancamentos
+        else " WHERE " + status_filter
+    )
     df = pd.read_sql_query(
         f"SELECT id, data, tipo, descricao, valor FROM lancamentos{where_lancamentos}",
         conn,
