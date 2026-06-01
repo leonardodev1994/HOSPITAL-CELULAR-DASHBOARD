@@ -14,6 +14,8 @@ from utils.estoque import (
     load_stock_movements,
     preview_inventory_import,
     produto_label,
+    deactivate_stock_product,
+    update_stock_product,
 )
 
 
@@ -147,6 +149,8 @@ def render_estoque(conn):
     st.session_state.setdefault("estoque_form_aberto", False)
     st.session_state.setdefault("estoque_salvando", False)
     st.session_state.setdefault("estoque_ajuste_salvando", False)
+    st.session_state.setdefault("estoque_editando_id", None)
+    st.session_state.setdefault("estoque_excluir_id", None)
 
     page_banner("tx_estoque_banner.webp", "TX System - Estoque")
     page_header(
@@ -262,53 +266,98 @@ def render_estoque(conn):
         ]
 
     st.subheader("Produtos em estoque")
-    tabela = _stock_table(df_filtrado)
-    st.dataframe(
-        tabela,
-        width="stretch",
-        hide_index=True,
-        column_config={
-            "id": None,
-            "Valor Venda": st.column_config.NumberColumn("Valor Venda", format="R$ %.2f"),
-        },
-    )
+    st.caption("Lista compacta. Clique no lápis para editar e na lixeira para inativar.")
+
+    for row in df_filtrado.head(120).itertuples():
+        col_info, col_edit, col_delete = st.columns([7, 1, 1])
+        with col_info:
+            status = "Baixo" if row.quantidade <= row.estoque_minimo else "OK"
+            st.markdown(
+                f"**{produto_label(row)}** · {row.categoria or 'Sem categoria'} · "
+                f"Qtd: **{row.quantidade:g}** · Venda: **{moeda(row.valor_venda)}** · {status}"
+            )
+        if can_manage_stock:
+            with col_edit:
+                if st.button("✏️", key=f"editar_produto_{row.id}", help="Editar produto"):
+                    st.session_state["estoque_editando_id"] = row.id
+                    st.session_state["estoque_excluir_id"] = None
+                    st.rerun()
+            with col_delete:
+                if st.button("🗑️", key=f"excluir_produto_{row.id}", help="Inativar produto"):
+                    st.session_state["estoque_excluir_id"] = row.id
+                    st.session_state["estoque_editando_id"] = None
+                    st.rerun()
+
+        if st.session_state.get("estoque_editando_id") == row.id:
+            with st.container(border=True):
+                st.markdown(f"#### Editar {produto_label(row)}")
+                with st.form(f"editar_produto_form_{row.id}"):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        codigo_edit = st.text_input("Código/SKU", value=row.codigo or "")
+                        produto_edit = st.text_input("Produto", value=row.produto or "")
+                        modelo_edit = st.text_input("Modelo", value=row.modelo or "")
+                    with c2:
+                        categoria_edit = st.text_input("Categoria", value=row.categoria or "")
+                        marca_edit = st.text_input("Marca", value=row.marca or "")
+                        quantidade_edit = st.number_input("Quantidade", min_value=0.0, value=float(row.quantidade or 0), step=1.0)
+                    with c3:
+                        custo_edit = st.number_input("Custo", min_value=0.0, value=float(row.custo or 0), step=1.0)
+                        valor_edit = st.number_input("Valor de venda", min_value=0.0, value=float(row.valor_venda or 0), step=1.0)
+                        minimo_edit = st.number_input("Estoque mínimo", min_value=0.0, value=float(row.estoque_minimo or 0), step=1.0)
+                    fornecedor_edit = st.text_input("Fornecedor", value=row.fornecedor or "")
+                    observacao_edit = st.text_area("Observação", value=row.observacao or "")
+                    salvar_edit = st.form_submit_button("Salvar edição", disabled=st.session_state["estoque_ajuste_salvando"])
+                    cancelar_edit = st.form_submit_button("Cancelar")
+
+                if cancelar_edit:
+                    st.session_state["estoque_editando_id"] = None
+                    st.rerun()
+                if salvar_edit and not st.session_state["estoque_ajuste_salvando"]:
+                    try:
+                        st.session_state["estoque_ajuste_salvando"] = True
+                        update_stock_product(
+                            conn,
+                            row.id,
+                            produto_edit,
+                            modelo_edit,
+                            categoria_edit,
+                            quantidade_edit,
+                            valor_edit,
+                            minimo_edit,
+                            observacao_edit,
+                            codigo=codigo_edit,
+                            marca=marca_edit,
+                            custo=custo_edit,
+                            fornecedor=fornecedor_edit,
+                        )
+                        st.session_state["estoque_editando_id"] = None
+                        st.success("Produto atualizado.")
+                        st.rerun()
+                    except Exception as error:
+                        st.error(str(error))
+                    finally:
+                        st.session_state["estoque_ajuste_salvando"] = False
+
+        if st.session_state.get("estoque_excluir_id") == row.id:
+            with st.container(border=True):
+                st.warning(f"Inativar {produto_label(row)}? O produto não será apagado definitivamente.")
+                confirmar = st.checkbox("Confirmo que quero inativar este produto", key=f"confirmar_inativar_produto_{row.id}")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("Cancelar", key=f"cancelar_inativar_produto_{row.id}", width="stretch"):
+                        st.session_state["estoque_excluir_id"] = None
+                        st.rerun()
+                with c2:
+                    if st.button("Inativar produto", key=f"inativar_produto_{row.id}", width="stretch", disabled=not confirmar):
+                        deactivate_stock_product(conn, row.id)
+                        st.session_state["estoque_excluir_id"] = None
+                        st.success("Produto inativado.")
+                        st.rerun()
 
     if not can_manage_stock:
         st.caption("Seu perfil permite consultar o estoque, mas não alterar quantidades ou valores.")
         return
-
-    st.divider()
-    st.subheader("Ajustar produto")
-
-    options = {
-        f"{produto_label(row)} | Qtd: {row.quantidade:g}": row.id
-        for row in df.itertuples()
-    }
-    selected_label = st.selectbox("Produto", list(options.keys()))
-    produto_id = options[selected_label]
-    selected = df[df["id"] == produto_id].iloc[0]
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        quantidade = st.number_input("Quantidade", min_value=0.0, value=float(selected["quantidade"]), step=1.0)
-    with col2:
-        valor_venda = st.number_input("Valor de venda", min_value=0.0, value=float(selected["valor_venda"]), step=1.0)
-    with col3:
-        estoque_minimo = st.number_input("Estoque mínimo", min_value=0.0, value=float(selected["estoque_minimo"]), step=1.0)
-
-    observacao = st.text_area("Observação", value=selected["observacao"] or "")
-
-    if st.button("Salvar ajuste", width="stretch", disabled=st.session_state["estoque_ajuste_salvando"]):
-        if st.session_state["estoque_ajuste_salvando"]:
-            return
-
-        try:
-            st.session_state["estoque_ajuste_salvando"] = True
-            adjust_stock(conn, produto_id, quantidade, valor_venda, estoque_minimo, observacao)
-            st.success("✅ Estoque atualizado.")
-            st.rerun()
-        finally:
-            st.session_state["estoque_ajuste_salvando"] = False
 
     st.divider()
     st.subheader("Movimentações recentes")

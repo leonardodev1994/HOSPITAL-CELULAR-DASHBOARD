@@ -777,3 +777,90 @@ def adjust_stock(conn, produto_id, quantidade, valor_venda, estoque_minimo, obse
             diferenca,
             "Ajuste manual de estoque",
         )
+
+
+def update_stock_product(
+    conn,
+    produto_id,
+    produto,
+    modelo,
+    categoria,
+    quantidade,
+    valor_venda,
+    estoque_minimo,
+    observacao,
+    codigo="",
+    marca="",
+    custo=0,
+    fornecedor="",
+):
+    produto = normalize_text(produto)
+    if not produto:
+        raise ValueError("Informe o nome do produto.")
+
+    quantidade = float(quantidade or 0)
+    valor_venda = float(valor_venda or 0)
+    estoque_minimo = float(estoque_minimo or 0)
+    custo = float(custo or 0)
+    if quantidade < 0 or valor_venda < 0 or estoque_minimo < 0 or custo < 0:
+        raise ValueError("Quantidade, custo e valores não podem ser negativos.")
+
+    cursor = conn.cursor()
+    atual = cursor.execute(
+        "SELECT quantidade FROM estoque WHERE id = ? AND quiosque_id = ?",
+        (produto_id, current_quiosque_id()),
+    ).fetchone()
+    quantidade_anterior = float(atual[0] or 0) if atual else 0
+    diferenca = quantidade - quantidade_anterior
+
+    cursor.execute("""
+    UPDATE estoque
+    SET codigo = ?,
+        produto = ?,
+        modelo = ?,
+        categoria = ?,
+        marca = ?,
+        quantidade = ?,
+        custo = ?,
+        valor_venda = ?,
+        fornecedor = ?,
+        estoque_minimo = ?,
+        observacao = ?,
+        atualizado_em = CURRENT_TIMESTAMP
+    WHERE id = ? AND quiosque_id = ?
+    """, (
+        normalize_text(codigo),
+        produto,
+        normalize_text(modelo),
+        normalize_text(categoria),
+        normalize_text(marca),
+        quantidade,
+        custo,
+        valor_venda,
+        normalize_text(fornecedor),
+        estoque_minimo,
+        normalize_text(observacao),
+        produto_id,
+        current_quiosque_id(),
+    ))
+    conn.commit()
+
+    if diferenca != 0:
+        register_stock_movement(
+            conn,
+            produto_id,
+            "Ajuste",
+            diferenca,
+            "Edição de produto",
+        )
+
+
+def deactivate_stock_product(conn, produto_id):
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE estoque
+    SET ativo = 0,
+        atualizado_em = CURRENT_TIMESTAMP
+    WHERE id = ? AND quiosque_id = ?
+    """, (produto_id, current_quiosque_id()))
+    conn.commit()

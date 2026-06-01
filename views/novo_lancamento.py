@@ -8,42 +8,51 @@ from utils.audit import log_action
 from utils.auth import current_user
 from utils.dashboard_ui import moeda, page_banner
 from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
-from utils.permissions import has_permission
 from utils.quiosques import current_quiosque_id, scope_clause
 from utils.sales_authorization import can_directly_change_sale, validate_sale_authorization
 
 
-def _load_lancamentos(conn):
-    scope, params = scope_clause()
-    status_filter = "COALESCE(status, 'Ativo') <> 'Cancelado'"
-    if scope:
-        scope += " AND " + status_filter
-    else:
-        scope = " WHERE " + status_filter
+def _load_lancamentos(conn, data_inicio=None, data_fim=None, limit=100):
+    scope, params = scope_clause("l", prefix="AND")
+    filters = ["COALESCE(l.status, 'Ativo') <> 'Cancelado'"]
+    query_params = []
+
+    if data_inicio:
+        filters.append("l.data >= ?")
+        query_params.append(str(data_inicio))
+    if data_fim:
+        filters.append("l.data <= ?")
+        query_params.append(str(data_fim))
+
+    where_sql = " WHERE " + " AND ".join(filters) + scope
     return pd.read_sql_query("""
     SELECT
-        id,
-        data,
-        tipo,
-        descricao,
-        valor,
-        produto_id,
-        quantidade,
-        venda_id,
-        venda_item_id,
-        preco_original,
-        preco_vendido,
-        diferenca_preco,
-        observacao_alteracao_preco,
-        usuario_responsavel_preco,
-        data_hora_alteracao_preco,
-        status,
-        quiosque_id
-    FROM lancamentos
-    """ + scope + """
-    ORDER BY data DESC, id DESC
-    LIMIT 150
-    """, conn, params=params)
+        l.id,
+        l.data,
+        l.tipo,
+        l.descricao,
+        l.valor,
+        l.produto_id,
+        l.quantidade,
+        l.venda_id,
+        l.venda_item_id,
+        l.preco_original,
+        l.preco_vendido,
+        l.diferenca_preco,
+        l.observacao_alteracao_preco,
+        l.usuario_responsavel_preco,
+        l.data_hora_alteracao_preco,
+        l.status,
+        l.quiosque_id,
+        q.nome AS quiosque_nome,
+        v.usuario_nome AS usuario_responsavel
+    FROM lancamentos l
+    LEFT JOIN quiosques q ON q.id = l.quiosque_id
+    LEFT JOIN vendas v ON v.id = l.venda_id
+    """ + where_sql + """
+    ORDER BY l.data DESC, l.id DESC
+    LIMIT ?
+    """, conn, params=tuple(query_params) + params + (int(limit),))
 
 
 def _update_venda_status(conn, venda_id, sale_quiosque_id, authorizer=None, motivo=""):
@@ -598,10 +607,12 @@ def render_novo_lancamento(conn):
     items = _cart_items()
     user = current_user()
     st.session_state.setdefault("venda_salvando", False)
+    st.session_state.setdefault("novo_lancamento_form_version", 0)
+    form_version = st.session_state["novo_lancamento_form_version"]
 
     page_banner("tx_lancamento_banner.webp", "TX System - Novo Lançamento")
     st.subheader("➕ Novo Lançamento")
-    data = st.date_input("Data da venda", datetime.today())
+    data = st.date_input("Data da venda", datetime.today(), key=f"venda_data_{form_version}")
 
     st.markdown("#### Adicionar itens")
     tab_produto, tab_servico = st.tabs(["Produto do estoque", "Serviço manual"])
@@ -618,7 +629,7 @@ def render_novo_lancamento(conn):
                     f"{produto_label(row)} | Qtd: {row.quantidade:g} | R$ {row.valor_venda:.2f}": row.id
                     for row in produtos_disponiveis.itertuples()
                 }
-                selected_label = st.selectbox("Produto", list(options.keys()), key="cart_produto")
+                selected_label = st.selectbox("Produto", list(options.keys()), key=f"cart_produto_{form_version}")
                 produto_id = options[selected_label]
                 produto = produtos_disponiveis[produtos_disponiveis["id"] == produto_id].iloc[0]
                 descricao = produto_label(produto)
@@ -633,7 +644,7 @@ def render_novo_lancamento(conn):
                         max_value=max_qtd,
                         value=1.0,
                         step=1.0,
-                        key=f"cart_produto_quantidade_{produto_id}",
+                        key=f"cart_produto_quantidade_{produto_id}_{form_version}",
                     )
                 with col2:
                     valor_unitario = st.number_input(
@@ -641,7 +652,7 @@ def render_novo_lancamento(conn):
                         min_value=0.0,
                         value=preco_cadastrado,
                         step=1.0,
-                        key=f"cart_produto_valor_{produto_id}",
+                        key=f"cart_produto_valor_{produto_id}_{form_version}",
                     )
 
                 diferenca_preco = float(valor_unitario) - preco_cadastrado
@@ -655,7 +666,7 @@ def render_novo_lancamento(conn):
                 observacao_preco = st.text_input(
                     "Motivo da alteração de preço",
                     placeholder="Obrigatório se vender abaixo do preço cadastrado",
-                    key=f"cart_produto_motivo_preco_{produto_id}",
+                    key=f"cart_produto_motivo_preco_{produto_id}_{form_version}",
                 )
 
                 if st.button("Adicionar produto", width="stretch"):
@@ -681,11 +692,11 @@ def render_novo_lancamento(conn):
     with tab_servico:
         col1, col2, col3 = st.columns([2, 1, 1])
         with col1:
-            servico_descricao = st.text_input("Descrição do serviço", key="cart_servico_descricao")
+            servico_descricao = st.text_input("Descrição do serviço", key=f"cart_servico_descricao_{form_version}")
         with col2:
-            servico_quantidade = st.number_input("Quantidade", min_value=1.0, value=1.0, step=1.0, key="cart_servico_quantidade")
+            servico_quantidade = st.number_input("Quantidade", min_value=1.0, value=1.0, step=1.0, key=f"cart_servico_quantidade_{form_version}")
         with col3:
-            servico_valor = st.number_input("Valor unitário", min_value=0.0, value=0.0, step=1.0, key="cart_servico_valor")
+            servico_valor = st.number_input("Valor unitário", min_value=0.0, value=0.0, step=1.0, key=f"cart_servico_valor_{form_version}")
 
         if st.button("Adicionar serviço", width="stretch"):
             if not servico_descricao.strip():
@@ -745,13 +756,13 @@ def render_novo_lancamento(conn):
     st.subheader("💳 Pagamentos")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        dinheiro = st.number_input("Dinheiro", min_value=0.0, value=0.0, step=1.0)
+        dinheiro = st.number_input("Dinheiro", min_value=0.0, value=0.0, step=1.0, key=f"pag_dinheiro_{form_version}")
     with c2:
-        pix = st.number_input("Pix", min_value=0.0, value=0.0, step=1.0)
+        pix = st.number_input("Pix", min_value=0.0, value=0.0, step=1.0, key=f"pag_pix_{form_version}")
     with c3:
-        credito = st.number_input("Crédito", min_value=0.0, value=0.0, step=1.0)
+        credito = st.number_input("Crédito", min_value=0.0, value=0.0, step=1.0, key=f"pag_credito_{form_version}")
     with c4:
-        debito = st.number_input("Débito", min_value=0.0, value=0.0, step=1.0)
+        debito = st.number_input("Débito", min_value=0.0, value=0.0, step=1.0, key=f"pag_debito_{form_version}")
 
     pagamentos = [
         ("Dinheiro", dinheiro),
@@ -766,7 +777,16 @@ def render_novo_lancamento(conn):
     c1.metric("Total pago", moeda(total_pagamentos))
     c2.metric("Diferença", moeda(diferenca))
 
-    if st.button("Salvar venda", width="stretch", type="primary", disabled=st.session_state["venda_salvando"]):
+    can_save = bool(items) and total_itens > 0 and total_pagamentos > 0 and abs(total_pagamentos - total_itens) <= 0.01
+    if not can_save:
+        st.caption("Adicione produto/serviço e informe uma forma de pagamento com total igual ao valor da venda.")
+
+    if st.button(
+        "Salvar venda",
+        width="stretch",
+        type="primary",
+        disabled=st.session_state["venda_salvando"] or not can_save,
+    ):
         if st.session_state["venda_salvando"]:
             return
 
@@ -804,80 +824,6 @@ def render_novo_lancamento(conn):
             st.session_state["venda_salvando"] = False
 
         _clear_cart()
+        st.session_state["novo_lancamento_form_version"] += 1
         st.success("✅ Venda salva com todos os itens!")
         st.rerun()
-
-    st.divider()
-    st.subheader("🧾 Lançamentos recentes")
-
-    df_lancamentos = _load_lancamentos(conn)
-    if df_lancamentos.empty:
-        st.caption("Nenhum lançamento cadastrado.")
-        return
-
-    tabela = df_lancamentos.head(30).copy()
-    tabela = tabela.rename(columns={
-        "id": "ID",
-        "data": "Data",
-        "tipo": "Tipo",
-        "descricao": "Descrição",
-        "valor": "Valor",
-        "quantidade": "Qtd",
-        "preco_original": "Preço cadastrado",
-        "preco_vendido": "Preço vendido",
-        "diferenca_preco": "Diferença",
-        "observacao_alteracao_preco": "Motivo preço",
-    })
-
-    tabela["Status preço"] = tabela["Diferença"].apply(
-        lambda value: (
-            "Acima do preço" if float(value or 0) > 0.01
-            else "Com desconto" if float(value or 0) < -0.01
-            else "Preço normal"
-        )
-    )
-
-    st.dataframe(
-        tabela[[
-            "ID",
-            "Data",
-            "Tipo",
-            "Descrição",
-            "Qtd",
-            "Valor",
-            "Status preço",
-            "Diferença",
-            "Motivo preço",
-        ]],
-        width="stretch",
-        hide_index=True,
-        column_config={
-            "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
-            "Diferença": st.column_config.NumberColumn("Diferença", format="R$ %.2f"),
-        },
-    )
-
-    st.markdown("#### Ações")
-    st.caption("Admin e gerente do quiosque executam direto. Atendente precisa de autorização sem sair do login.")
-
-    for row in df_lancamentos.head(30).itertuples():
-        col_info, col_edit, col_cancel = st.columns([6, 1, 1])
-        with col_info:
-            st.markdown(f"**#{row.id}** · {row.data} · {row.tipo} · {row.descricao} · **{moeda(row.valor)}**")
-        with col_edit:
-            if st.button("✏️", key=f"editar_lancamento_{row.id}", help="Editar lançamento"):
-                _request_lancamento_action("edit", row.id)
-                st.rerun()
-        with col_cancel:
-            if st.button("🗑️", key=f"cancelar_lancamento_{row.id}", help="Cancelar lançamento"):
-                _request_lancamento_action("cancel", row.id)
-                st.rerun()
-
-    action_data = st.session_state.get("lancamento_action")
-    if action_data:
-        selected_id = int(action_data["lancamento_id"])
-        selected_rows = df_lancamentos[df_lancamentos["id"] == selected_id]
-        if selected_rows.empty:
-            st.session_state.pop("lancamento_action", None)
-        else:
-            _render_lancamento_action_dialog(conn, selected_rows.iloc[0].to_dict(), user)

@@ -63,6 +63,7 @@ MENU_PERMISSIONS = {
     "Clientes": None,
     "Estoque": "view_stock",
     "Novo Lançamento": "create_sales",
+    "Lançamentos": "create_sales",
     "Lançamentos Cancelados": "view_canceled_sales",
     "Caixa Diário": "view_daily_cash",
     "Despesas": "view_expenses",
