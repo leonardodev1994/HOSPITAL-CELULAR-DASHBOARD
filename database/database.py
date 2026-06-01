@@ -103,6 +103,7 @@ MIGRATIONS = [
     ("0003_renomeia_quiosques", "_migration_0003_renomeia_quiosques"),
     ("0004_os_history_notifications", "_migration_0004_os_history_notifications"),
     ("0005_preco_alterado_venda", "_migration_0005_preco_alterado_venda"),
+    ("0006_estoque_planilha", "_migration_0006_estoque_planilha"),
 ]
 
 
@@ -211,6 +212,14 @@ def _migration_0005_preco_alterado_venda(conn):
     _create_sqlite_price_change_schema(conn)
 
 
+def _migration_0006_estoque_planilha(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_stock_spreadsheet_schema(conn)
+        return
+
+    _create_sqlite_stock_spreadsheet_schema(conn)
+
+
 def ensure_quiosques_schema(conn):
     if getattr(conn, "backend", "sqlite") == "postgres":
         _create_postgres_quiosque_schema(conn)
@@ -291,6 +300,10 @@ def _create_sqlite_schema(conn):
         estoque_minimo REAL NOT NULL DEFAULT 0,
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
+        codigo TEXT,
+        marca TEXT,
+        custo REAL,
+        fornecedor TEXT,
         criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
         atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
     )
@@ -501,6 +514,10 @@ def _create_postgres_schema(conn):
         estoque_minimo DOUBLE PRECISION NOT NULL DEFAULT 0,
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
+        codigo TEXT,
+        marca TEXT,
+        custo DOUBLE PRECISION,
+        fornecedor TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -748,6 +765,55 @@ def _create_postgres_price_change_schema(conn):
         _add_postgres_column_if_missing(cursor, table, "observacao_alteracao_preco", "TEXT")
         _add_postgres_column_if_missing(cursor, table, "usuario_responsavel_preco", "TEXT")
         _add_postgres_column_if_missing(cursor, table, "data_hora_alteracao_preco", "TIMESTAMP")
+
+
+def _create_sqlite_stock_spreadsheet_schema(conn):
+    cursor = conn.cursor()
+    _add_column_if_missing(cursor, "estoque", "codigo", "TEXT")
+    _add_column_if_missing(cursor, "estoque", "marca", "TEXT")
+    _add_column_if_missing(cursor, "estoque", "custo", "REAL")
+    _add_column_if_missing(cursor, "estoque", "fornecedor", "TEXT")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS estoque_importacoes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        arquivo TEXT,
+        cadastrados INTEGER NOT NULL DEFAULT 0,
+        atualizados INTEGER NOT NULL DEFAULT 0,
+        ignorados INTEGER NOT NULL DEFAULT 0,
+        erros INTEGER NOT NULL DEFAULT 0,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_codigo_quiosque ON estoque(codigo, quiosque_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_importacoes_quiosque ON estoque_importacoes(quiosque_id)")
+
+
+def _create_postgres_stock_spreadsheet_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    _add_postgres_column_if_missing(cursor, "estoque", "codigo", "TEXT")
+    _add_postgres_column_if_missing(cursor, "estoque", "marca", "TEXT")
+    _add_postgres_column_if_missing(cursor, "estoque", "custo", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "estoque", "fornecedor", "TEXT")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS estoque_importacoes (
+        id SERIAL PRIMARY KEY,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        arquivo TEXT,
+        cadastrados INTEGER NOT NULL DEFAULT 0,
+        atualizados INTEGER NOT NULL DEFAULT 0,
+        ignorados INTEGER NOT NULL DEFAULT 0,
+        erros INTEGER NOT NULL DEFAULT 0,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_codigo_quiosque ON estoque(codigo, quiosque_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_estoque_importacoes_quiosque ON estoque_importacoes(quiosque_id)")
 
 
 def _seed_quiosques(cursor):

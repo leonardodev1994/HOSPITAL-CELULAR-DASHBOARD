@@ -1,17 +1,18 @@
-import os
-
 import pandas as pd
 import streamlit as st
 
+from utils.auth import current_user
 from utils.dashboard_ui import metric_card, moeda, page_banner, page_header
 from utils.permissions import has_permission
 from utils.estoque import (
-    PLANILHA_PADRAO,
     add_stock_product,
     adjust_stock,
-    import_inventory_from_excel,
+    apply_inventory_import,
+    export_stock_to_excel,
+    import_template_excel,
     load_stock,
     load_stock_movements,
+    preview_inventory_import,
     produto_label,
 )
 
@@ -33,7 +34,115 @@ def _stock_table(df):
     return tabela[["id", "Produto", "Categoria", "Qtd", "Valor Venda", "Mínimo", "Status", "Observação"]]
 
 
+def _render_spreadsheet_tools(conn, df, user):
+    st.subheader("Planilha de estoque")
+    st.caption("Exporte, baixe o modelo ou importe produtos em massa com pré-visualização antes de gravar.")
+
+    col_export, col_template = st.columns(2)
+    with col_export:
+        st.download_button(
+            "Exportar estoque",
+            data=export_stock_to_excel(df),
+            file_name="estoque_tx_system.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            width="stretch",
+        )
+    with col_template:
+        st.download_button(
+            "Baixar modelo de importação",
+            data=import_template_excel(),
+            file_name="modelo_importacao_estoque_tx.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            width="stretch",
+        )
+
+    with st.expander("Importar estoque", expanded=False):
+        uploaded_file = st.file_uploader(
+            "Enviar planilha .xlsx",
+            type=["xlsx"],
+            key="importar_estoque_xlsx",
+        )
+
+        if not uploaded_file:
+            st.info("Envie uma planilha para conferir a prévia antes da importação.")
+            return
+
+        try:
+            uploaded_file.seek(0)
+            preview_df, summary = preview_inventory_import(conn, uploaded_file, user=user)
+        except Exception as error:
+            st.error(f"Não foi possível ler a planilha: {error}")
+            return
+
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            metric_card("Cadastrar", summary["cadastrar"], "Novos produtos", "#18C29C")
+        with m2:
+            metric_card("Atualizar", summary["atualizar"], "Produtos existentes", "#5B8DEF")
+        with m3:
+            metric_card("Ignorar", summary["ignorar"], "Linhas vazias", "#64748B")
+        with m4:
+            metric_card("Erros", summary["erro"], "Corrigir antes de importar", "#EF4444")
+
+        preview_cols = [
+            "linha",
+            "acao",
+            "codigo",
+            "produto",
+            "categoria",
+            "marca",
+            "modelo",
+            "quantidade",
+            "custo",
+            "valor_venda",
+            "fornecedor",
+            "estoque_minimo",
+            "erro",
+        ]
+        available_cols = [col for col in preview_cols if col in preview_df.columns]
+        st.dataframe(
+            preview_df[available_cols],
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "linha": st.column_config.NumberColumn("Linha", format="%d"),
+                "acao": "Ação",
+                "codigo": "Código/SKU",
+                "produto": "Produto",
+                "quantidade": st.column_config.NumberColumn("Quantidade", format="%.0f"),
+                "custo": st.column_config.NumberColumn("Custo", format="R$ %.2f"),
+                "valor_venda": st.column_config.NumberColumn("Preço de venda", format="R$ %.2f"),
+                "estoque_minimo": st.column_config.NumberColumn("Estoque mínimo", format="%.0f"),
+                "erro": "Validação",
+            },
+        )
+
+        if summary["erro"] > 0:
+            st.warning("Corrija as linhas com erro na planilha antes de confirmar a importação.")
+            return
+
+        importable = summary["cadastrar"] + summary["atualizar"]
+        if importable <= 0:
+            st.info("Nenhum produto válido para importar.")
+            return
+
+        confirmed = st.checkbox(
+            "Confirmo que revisei a prévia e quero importar/atualizar o estoque.",
+            key="confirmar_importacao_estoque",
+        )
+        if st.button("Confirmar importação", width="stretch", disabled=not confirmed):
+            result = apply_inventory_import(conn, preview_df, filename=uploaded_file.name, user=user)
+            st.success(
+                "Importação concluída: "
+                f"{result['cadastrados']} cadastrados, "
+                f"{result['atualizados']} atualizados, "
+                f"{result['ignorados']} ignorados."
+            )
+            st.rerun()
+
+
 def render_estoque(conn):
+    user = current_user()
     can_manage_stock = has_permission("manage_stock")
     st.session_state.setdefault("estoque_form_aberto", False)
     st.session_state.setdefault("estoque_salvando", False)
@@ -77,17 +186,21 @@ def render_estoque(conn):
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
+                    codigo = st.text_input("Código/SKU", placeholder="Opcional")
                     produto = st.text_input("Produto")
                     modelo = st.text_input("Modelo", placeholder="Opcional")
 
                 with col2:
                     categoria = st.text_input("Categoria", placeholder="Ex.: Carregadores, Películas")
+                    marca = st.text_input("Marca", placeholder="Opcional")
                     quantidade = st.number_input("Quantidade inicial", min_value=0.0, value=1.0, step=1.0)
 
                 with col3:
+                    custo = st.number_input("Custo", min_value=0.0, value=0.0, step=1.0)
                     valor_venda = st.number_input("Valor de venda", min_value=0.0, value=0.0, step=1.0)
                     estoque_minimo = st.number_input("Estoque mínimo", min_value=0.0, value=1.0, step=1.0)
 
+                fornecedor = st.text_input("Fornecedor", placeholder="Opcional")
                 observacao = st.text_area("Observação")
                 col_salvar, col_cancelar = st.columns(2)
                 with col_salvar:
@@ -111,6 +224,10 @@ def render_estoque(conn):
                         valor_venda,
                         estoque_minimo,
                         observacao,
+                        codigo=codigo,
+                        marca=marca,
+                        custo=custo,
+                        fornecedor=fornecedor,
                     )
                     if updated:
                         st.success("✅ Produto já existia. A quantidade foi somada ao estoque.")
@@ -125,37 +242,8 @@ def render_estoque(conn):
                 finally:
                     st.session_state["estoque_salvando"] = False
 
-        with st.expander("Importar planilha de estoque", expanded=df.empty):
-            st.caption("Películas serão consolidadas automaticamente como Película 3D.")
-
-            uploaded_file = st.file_uploader(
-                "Enviar arquivo Excel",
-                type=["xlsx"],
-                key="importar_estoque_xlsx",
-            )
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Importar planilha padrão", width="stretch"):
-                    try:
-                        created, updated, total = import_inventory_from_excel(conn, PLANILHA_PADRAO)
-                        st.success(f"✅ Importação concluída: {created} novos, {updated} atualizados, {total} produtos lidos.")
-                        st.rerun()
-                    except Exception as error:
-                        st.error(f"Erro ao importar: {error}")
-
-            with col2:
-                if uploaded_file and st.button("Importar arquivo enviado", width="stretch"):
-                    temp_path = "uploads/estoque_importado.xlsx"
-                    os.makedirs("uploads", exist_ok=True)
-                    with open(temp_path, "wb") as file:
-                        file.write(uploaded_file.getbuffer())
-                    try:
-                        created, updated, total = import_inventory_from_excel(conn, temp_path)
-                        st.success(f"✅ Importação concluída: {created} novos, {updated} atualizados, {total} produtos lidos.")
-                        st.rerun()
-                    except Exception as error:
-                        st.error(f"Erro ao importar: {error}")
+        st.divider()
+        _render_spreadsheet_tools(conn, df, user)
 
     df = load_stock(conn)
 
