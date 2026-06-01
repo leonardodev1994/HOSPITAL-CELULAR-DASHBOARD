@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import metric_card, moeda, page_header
+from utils.dashboard_ui import metric_card, moeda, page_banner, page_header
 from utils.permissions import has_permission
 from utils.estoque import (
     PLANILHA_PADRAO,
@@ -39,6 +39,7 @@ def render_estoque(conn):
     st.session_state.setdefault("estoque_salvando", False)
     st.session_state.setdefault("estoque_ajuste_salvando", False)
 
+    page_banner("tx_estoque_banner.webp", "TX System - Estoque")
     page_header(
         "Estoque",
         "Controle de produtos, importação da planilha e alerta de estoque baixo.",

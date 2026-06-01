@@ -10,7 +10,7 @@ from streamlit_drawable_canvas import st_canvas
 from database.database import execute_insert_returning_id
 from utils.audit import log_action
 from utils.auth import current_user
-from utils.dashboard_ui import page_header
+from utils.dashboard_ui import page_banner, page_header
 from utils.permissions import has_permission
 from utils.pdf_os import generate_os_pdf
 from utils.quiosques import current_quiosque_id, scope_clause
@@ -1456,6 +1456,7 @@ def _render_lista_ordens(conn):
 
 
 def render_ordem_servico(conn):
+    page_banner("tx_os_banner.webp", "TX System - Ordem de Serviço")
     page_header(
         "Ordem de Serviço",
         "Consulte clientes, acompanhe status, abra novas OS e imprima documentos técnicos.",

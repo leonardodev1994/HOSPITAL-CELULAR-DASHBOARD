@@ -3,7 +3,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import pie_chart
+from utils.dashboard_ui import page_banner, pie_chart
 from utils.permissions import has_permission
 from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
 
@@ -22,6 +22,7 @@ def render_caixa_diario(conn):
     cursor = conn.cursor()
     hoje = datetime.today().strftime("%Y-%m-%d")
 
+    page_banner("tx_caixa_banner.webp", "TX System - Caixa Diário")
     st.subheader("💰 Caixa Diário")
 
     valor_inicial = st.number_input("Valor Inicial", min_value=0.0)

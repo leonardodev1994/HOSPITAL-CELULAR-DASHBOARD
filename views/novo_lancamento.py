@@ -6,7 +6,7 @@ import streamlit as st
 from database.database import execute_insert_returning_id
 from utils.audit import log_action
 from utils.auth import current_user
-from utils.dashboard_ui import moeda
+from utils.dashboard_ui import moeda, page_banner
 from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
 from utils.permissions import has_permission
 from utils.quiosques import current_quiosque_id, scope_clause
@@ -253,6 +253,7 @@ def render_novo_lancamento(conn):
     user = current_user()
     st.session_state.setdefault("venda_salvando", False)
 
+    page_banner("tx_lancamento_banner.webp", "TX System - Novo Lançamento")
     st.subheader("➕ Novo Lançamento")
     data = st.date_input("Data da venda", datetime.today())
 

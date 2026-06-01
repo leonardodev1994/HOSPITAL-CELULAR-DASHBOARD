@@ -2359,17 +2359,19 @@ def apply_style():
         border-left: 4px solid var(--accent-2) !important;
     }
 
+    .tx-page-banner,
     .tx-dashboard-banner {
         width: 100%;
-        margin: 0 0 1.15rem;
-        aspect-ratio: 3 / 2;
+        margin: 0 0 1rem;
+        aspect-ratio: 2.5 / 1;
         overflow: hidden;
-        border-radius: 22px;
+        border-radius: 18px;
         border: 1px solid rgba(17, 24, 39, .10);
         background: #050706;
-        box-shadow: 0 22px 54px rgba(17, 24, 39, .16);
+        box-shadow: 0 18px 42px rgba(17, 24, 39, .13);
     }
 
+    .tx-page-banner img,
     .tx-dashboard-banner img {
         display: block;
         width: 100%;
@@ -2462,10 +2464,11 @@ def apply_style():
     }
 
     @media (max-width: 768px) {
+        .tx-page-banner,
         .tx-dashboard-banner {
             margin-bottom: .9rem;
-            aspect-ratio: 3 / 2;
-            border-radius: 16px;
+            aspect-ratio: 2.5 / 1;
+            border-radius: 14px;
             box-shadow: 0 14px 30px rgba(17, 24, 39, .13);
         }
     }

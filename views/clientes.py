@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from database.database import execute_insert_returning_id
+from utils.dashboard_ui import page_banner
 from utils.quiosques import current_quiosque_id, scope_clause
 
 
@@ -152,6 +153,7 @@ def _render_cliente_details(row):
 
 
 def render_clientes(conn):
+    page_banner("tx_clientes_banner.webp", "TX System - Clientes")
     st.subheader("👤 Clientes")
 
     st.session_state.setdefault("cliente_form_aberto", False)
