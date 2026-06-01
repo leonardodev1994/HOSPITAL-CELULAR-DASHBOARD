@@ -72,6 +72,13 @@ def current_user():
 
 
 def normalize_profile(profile):
+    normalized = str(profile or "").strip().lower()
+    if normalized in {"admin", "administrador"}:
+        return PROFILE_ADMIN
+    if normalized in {"gerente de quiosque", "gerente"}:
+        return PROFILE_MANAGER
+    if normalized in {"atendente", "técnico", "tecnico"}:
+        return PROFILE_ATTENDANT
     if profile == "Técnico":
         return PROFILE_ATTENDANT
     if profile in PERFIS:

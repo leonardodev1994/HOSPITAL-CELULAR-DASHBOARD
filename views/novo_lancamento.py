@@ -25,6 +25,12 @@ def _load_lancamentos(conn):
         quantidade,
         venda_id,
         venda_item_id,
+        preco_original,
+        preco_vendido,
+        diferenca_preco,
+        observacao_alteracao_preco,
+        usuario_responsavel_preco,
+        data_hora_alteracao_preco,
         quiosque_id
     FROM lancamentos
     """ + scope + """
@@ -106,12 +112,21 @@ def _clear_cart():
 def _cart_table(items):
     rows = []
     for index, item in enumerate(items, start=1):
+        diferenca = float(item.get("diferenca_preco") or 0)
+        if item["tipo"] == "Produto":
+            status_preco = "Acima do preço" if diferenca > 0.01 else "Com desconto" if diferenca < -0.01 else "Preço normal"
+        else:
+            status_preco = "-"
         rows.append({
             "#": index,
             "Tipo": item["tipo"],
             "Descrição": item["descricao"],
             "Qtd": item["quantidade"],
+            "Preço cadastrado": item.get("preco_original"),
             "Valor unitário": item["valor_unitario"],
+            "Diferença unit.": item.get("diferenca_preco"),
+            "Status preço": status_preco,
+            "Motivo": item.get("observacao_alteracao_preco") or "",
             "Total": _item_total(item),
         })
 
@@ -174,9 +189,31 @@ def _save_cart(conn, data, items, pagamentos, user=None):
     ))
 
     for item in items:
+        preco_original = item.get("preco_original")
+        preco_vendido = item.get("preco_vendido", item.get("valor_unitario"))
+        diferenca_preco = item.get("diferenca_preco")
+        observacao_preco = item.get("observacao_alteracao_preco")
+        usuario_responsavel = None if not user else user.get("nome")
+        data_hora_preco = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if item["tipo"] == "Produto" else None
+
         lancamento_id = execute_insert_returning_id(conn, cursor, """
-        INSERT INTO lancamentos (data, tipo, descricao, valor, produto_id, quantidade, venda_id, quiosque_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO lancamentos (
+            data,
+            tipo,
+            descricao,
+            valor,
+            produto_id,
+            quantidade,
+            venda_id,
+            quiosque_id,
+            preco_original,
+            preco_vendido,
+            diferenca_preco,
+            observacao_alteracao_preco,
+            usuario_responsavel_preco,
+            data_hora_alteracao_preco
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             str(data),
             item["tipo"],
@@ -186,6 +223,12 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             item["quantidade"] if item["tipo"] == "Produto" else None,
             venda_id,
             current_quiosque_id(user),
+            preco_original,
+            preco_vendido if item["tipo"] == "Produto" else None,
+            diferenca_preco,
+            observacao_preco,
+            usuario_responsavel if item["tipo"] == "Produto" else None,
+            data_hora_preco,
         ))
         lancamento_ids.append(lancamento_id)
 
@@ -199,9 +242,15 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             quantidade,
             valor_unitario,
             valor_total,
+            preco_original,
+            preco_vendido,
+            diferenca_preco,
+            observacao_alteracao_preco,
+            usuario_responsavel_preco,
+            data_hora_alteracao_preco,
             quiosque_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             venda_id,
             lancamento_id,
@@ -211,6 +260,12 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             item["quantidade"],
             item["valor_unitario"],
             _item_total(item),
+            preco_original,
+            preco_vendido if item["tipo"] == "Produto" else None,
+            diferenca_preco,
+            observacao_preco,
+            usuario_responsavel if item["tipo"] == "Produto" else None,
+            data_hora_preco,
             current_quiosque_id(user),
         ))
 
@@ -277,6 +332,7 @@ def render_novo_lancamento(conn):
                 produto = produtos_disponiveis[produtos_disponiveis["id"] == produto_id].iloc[0]
                 descricao = produto_label(produto)
                 max_qtd = float(produto["quantidade"])
+                preco_cadastrado = float(produto["valor_venda"] or 0)
 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -286,20 +342,36 @@ def render_novo_lancamento(conn):
                         max_value=max_qtd,
                         value=1.0,
                         step=1.0,
-                        key="cart_produto_quantidade",
+                        key=f"cart_produto_quantidade_{produto_id}",
                     )
                 with col2:
                     valor_unitario = st.number_input(
-                        "Valor unitário",
+                        "Valor da venda",
                         min_value=0.0,
-                        value=float(produto["valor_venda"] or 0),
+                        value=preco_cadastrado,
                         step=1.0,
-                        key="cart_produto_valor",
+                        key=f"cart_produto_valor_{produto_id}",
                     )
+
+                diferenca_preco = float(valor_unitario) - preco_cadastrado
+                if abs(diferenca_preco) <= 0.01:
+                    st.caption("Preço normal do cadastro.")
+                elif diferenca_preco > 0:
+                    st.info(f"Venda acima do preço cadastrado em {moeda(diferenca_preco)} por unidade.")
+                else:
+                    st.warning(f"Desconto de {moeda(abs(diferenca_preco))} por unidade.")
+
+                observacao_preco = st.text_input(
+                    "Motivo da alteração de preço",
+                    placeholder="Obrigatório se vender abaixo do preço cadastrado",
+                    key=f"cart_produto_motivo_preco_{produto_id}",
+                )
 
                 if st.button("Adicionar produto", width="stretch"):
                     if valor_unitario <= 0:
                         st.error("Informe o valor unitário do produto.")
+                    elif diferenca_preco < -0.01 and not observacao_preco.strip():
+                        st.error("Informe o motivo do desconto.")
                     else:
                         _add_cart_item({
                             "tipo": "Produto",
@@ -307,6 +379,10 @@ def render_novo_lancamento(conn):
                             "produto_id": int(produto_id),
                             "quantidade": float(quantidade),
                             "valor_unitario": float(valor_unitario),
+                            "preco_original": preco_cadastrado,
+                            "preco_vendido": float(valor_unitario),
+                            "diferenca_preco": diferenca_preco,
+                            "observacao_alteracao_preco": observacao_preco.strip(),
                         })
                         st.success("Produto adicionado à venda.")
                         st.rerun()
@@ -332,6 +408,10 @@ def render_novo_lancamento(conn):
                     "produto_id": None,
                     "quantidade": float(servico_quantidade),
                     "valor_unitario": float(servico_valor),
+                    "preco_original": None,
+                    "preco_vendido": None,
+                    "diferenca_preco": None,
+                    "observacao_alteracao_preco": "",
                 })
                 st.success("Serviço adicionado à venda.")
                 st.rerun()
@@ -349,6 +429,8 @@ def render_novo_lancamento(conn):
             hide_index=True,
             column_config={
                 "Valor unitário": st.column_config.NumberColumn("Valor unitário", format="R$ %.2f"),
+                "Preço cadastrado": st.column_config.NumberColumn("Preço cadastrado", format="R$ %.2f"),
+                "Diferença unit.": st.column_config.NumberColumn("Diferença unit.", format="R$ %.2f"),
                 "Total": st.column_config.NumberColumn("Total", format="R$ %.2f"),
             },
         )
@@ -414,6 +496,12 @@ def render_novo_lancamento(conn):
             st.error(message)
             return
 
+        for item in items:
+            if item["tipo"] == "Produto" and float(item.get("diferenca_preco") or 0) < -0.01:
+                if not str(item.get("observacao_alteracao_preco") or "").strip():
+                    st.error("Informe o motivo do desconto.")
+                    return
+
         try:
             st.session_state["venda_salvando"] = True
             _save_cart(conn, data, items, pagamentos, user=user)
@@ -444,14 +532,37 @@ def render_novo_lancamento(conn):
         "descricao": "Descrição",
         "valor": "Valor",
         "quantidade": "Qtd",
+        "preco_original": "Preço cadastrado",
+        "preco_vendido": "Preço vendido",
+        "diferenca_preco": "Diferença",
+        "observacao_alteracao_preco": "Motivo preço",
     })
 
+    tabela["Status preço"] = tabela["Diferença"].apply(
+        lambda value: (
+            "Acima do preço" if float(value or 0) > 0.01
+            else "Com desconto" if float(value or 0) < -0.01
+            else "Preço normal"
+        )
+    )
+
     st.dataframe(
-        tabela[["ID", "Data", "Tipo", "Descrição", "Qtd", "Valor"]],
+        tabela[[
+            "ID",
+            "Data",
+            "Tipo",
+            "Descrição",
+            "Qtd",
+            "Valor",
+            "Status preço",
+            "Diferença",
+            "Motivo preço",
+        ]],
         width="stretch",
         hide_index=True,
         column_config={
             "Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+            "Diferença": st.column_config.NumberColumn("Diferença", format="R$ %.2f"),
         },
     )
 

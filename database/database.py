@@ -102,6 +102,7 @@ MIGRATIONS = [
     ("0002_quiosques", "_migration_0002_quiosques"),
     ("0003_renomeia_quiosques", "_migration_0003_renomeia_quiosques"),
     ("0004_os_history_notifications", "_migration_0004_os_history_notifications"),
+    ("0005_preco_alterado_venda", "_migration_0005_preco_alterado_venda"),
 ]
 
 
@@ -200,6 +201,14 @@ def _migration_0004_os_history_notifications(conn):
         return
 
     _create_sqlite_os_audit_schema(conn)
+
+
+def _migration_0005_preco_alterado_venda(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_price_change_schema(conn)
+        return
+
+    _create_sqlite_price_change_schema(conn)
 
 
 def ensure_quiosques_schema(conn):
@@ -393,6 +402,18 @@ def _create_sqlite_schema(conn):
     _add_column_if_missing(cursor, "lancamentos", "quantidade", "REAL")
     _add_column_if_missing(cursor, "lancamentos", "venda_id", "INTEGER")
     _add_column_if_missing(cursor, "lancamentos", "venda_item_id", "INTEGER")
+    _add_column_if_missing(cursor, "lancamentos", "preco_original", "REAL")
+    _add_column_if_missing(cursor, "lancamentos", "preco_vendido", "REAL")
+    _add_column_if_missing(cursor, "lancamentos", "diferenca_preco", "REAL")
+    _add_column_if_missing(cursor, "lancamentos", "observacao_alteracao_preco", "TEXT")
+    _add_column_if_missing(cursor, "lancamentos", "usuario_responsavel_preco", "TEXT")
+    _add_column_if_missing(cursor, "lancamentos", "data_hora_alteracao_preco", "TEXT")
+    _add_column_if_missing(cursor, "venda_itens", "preco_original", "REAL")
+    _add_column_if_missing(cursor, "venda_itens", "preco_vendido", "REAL")
+    _add_column_if_missing(cursor, "venda_itens", "diferenca_preco", "REAL")
+    _add_column_if_missing(cursor, "venda_itens", "observacao_alteracao_preco", "TEXT")
+    _add_column_if_missing(cursor, "venda_itens", "usuario_responsavel_preco", "TEXT")
+    _add_column_if_missing(cursor, "venda_itens", "data_hora_alteracao_preco", "TEXT")
 
     _add_column_if_missing(cursor, "ordens_servico", "checklist_entrada", "TEXT")
     _add_column_if_missing(cursor, "ordens_servico", "checklist_reparo", "TEXT")
@@ -576,6 +597,18 @@ def _create_postgres_schema(conn):
     _add_postgres_column_if_missing(cursor, "lancamentos", "quantidade", "DOUBLE PRECISION")
     _add_postgres_column_if_missing(cursor, "lancamentos", "venda_id", "INTEGER")
     _add_postgres_column_if_missing(cursor, "lancamentos", "venda_item_id", "INTEGER")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "preco_original", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "preco_vendido", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "diferenca_preco", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "observacao_alteracao_preco", "TEXT")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "usuario_responsavel_preco", "TEXT")
+    _add_postgres_column_if_missing(cursor, "lancamentos", "data_hora_alteracao_preco", "TIMESTAMP")
+    _add_postgres_column_if_missing(cursor, "venda_itens", "preco_original", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "venda_itens", "preco_vendido", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "venda_itens", "diferenca_preco", "DOUBLE PRECISION")
+    _add_postgres_column_if_missing(cursor, "venda_itens", "observacao_alteracao_preco", "TEXT")
+    _add_postgres_column_if_missing(cursor, "venda_itens", "usuario_responsavel_preco", "TEXT")
+    _add_postgres_column_if_missing(cursor, "venda_itens", "data_hora_alteracao_preco", "TIMESTAMP")
 
 
 def _create_sqlite_quiosque_schema(conn):
@@ -692,6 +725,29 @@ def _create_postgres_os_audit_schema(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_os_historico_quiosque_id ON os_historico_alteracoes(quiosque_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_notificacoes_admin_lida ON notificacoes_admin(lida)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_notificacoes_admin_quiosque_id ON notificacoes_admin(quiosque_id)")
+
+
+def _create_sqlite_price_change_schema(conn):
+    cursor = conn.cursor()
+    for table in ["lancamentos", "venda_itens"]:
+        _add_column_if_missing(cursor, table, "preco_original", "REAL")
+        _add_column_if_missing(cursor, table, "preco_vendido", "REAL")
+        _add_column_if_missing(cursor, table, "diferenca_preco", "REAL")
+        _add_column_if_missing(cursor, table, "observacao_alteracao_preco", "TEXT")
+        _add_column_if_missing(cursor, table, "usuario_responsavel_preco", "TEXT")
+        _add_column_if_missing(cursor, table, "data_hora_alteracao_preco", "TEXT")
+
+
+def _create_postgres_price_change_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    for table in ["lancamentos", "venda_itens"]:
+        _add_postgres_column_if_missing(cursor, table, "preco_original", "DOUBLE PRECISION")
+        _add_postgres_column_if_missing(cursor, table, "preco_vendido", "DOUBLE PRECISION")
+        _add_postgres_column_if_missing(cursor, table, "diferenca_preco", "DOUBLE PRECISION")
+        _add_postgres_column_if_missing(cursor, table, "observacao_alteracao_preco", "TEXT")
+        _add_postgres_column_if_missing(cursor, table, "usuario_responsavel_preco", "TEXT")
+        _add_postgres_column_if_missing(cursor, table, "data_hora_alteracao_preco", "TIMESTAMP")
 
 
 def _seed_quiosques(cursor):
