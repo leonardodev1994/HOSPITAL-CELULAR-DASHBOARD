@@ -311,6 +311,21 @@ def _item_total(item):
     return float(item.get("quantidade") or 0) * float(item.get("valor_unitario") or 0)
 
 
+def _parse_money_input(value):
+    text = str(value or "").strip()
+    if not text:
+        return 0.0
+    text = text.replace("R$", "").replace(" ", "")
+    if "," in text and "." in text:
+        text = text.replace(".", "").replace(",", ".")
+    else:
+        text = text.replace(",", ".")
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
 def _cart_total(items):
     return sum(_item_total(item) for item in items)
 
@@ -647,13 +662,14 @@ def render_novo_lancamento(conn):
                         key=f"cart_produto_quantidade_{produto_id}_{form_version}",
                     )
                 with col2:
-                    valor_unitario = st.number_input(
+                    valor_padrao = "" if preco_cadastrado <= 0 else f"{preco_cadastrado:.2f}".replace(".", ",")
+                    valor_unitario_text = st.text_input(
                         "Valor da venda",
-                        min_value=0.0,
-                        value=preco_cadastrado,
-                        step=1.0,
+                        value=valor_padrao,
+                        placeholder="Digite o valor",
                         key=f"cart_produto_valor_{produto_id}_{form_version}",
                     )
+                    valor_unitario = _parse_money_input(valor_unitario_text)
 
                 diferenca_preco = float(valor_unitario) - preco_cadastrado
                 if abs(diferenca_preco) <= 0.01:
@@ -696,7 +712,13 @@ def render_novo_lancamento(conn):
         with col2:
             servico_quantidade = st.number_input("Quantidade", min_value=1.0, value=1.0, step=1.0, key=f"cart_servico_quantidade_{form_version}")
         with col3:
-            servico_valor = st.number_input("Valor unitário", min_value=0.0, value=0.0, step=1.0, key=f"cart_servico_valor_{form_version}")
+            servico_valor_text = st.text_input(
+                "Valor unitário",
+                value="",
+                placeholder="Digite o valor",
+                key=f"cart_servico_valor_{form_version}",
+            )
+            servico_valor = _parse_money_input(servico_valor_text)
 
         if st.button("Adicionar serviço", width="stretch"):
             if not servico_descricao.strip():
@@ -756,13 +778,13 @@ def render_novo_lancamento(conn):
     st.subheader("💳 Pagamentos")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        dinheiro = st.number_input("Dinheiro", min_value=0.0, value=0.0, step=1.0, key=f"pag_dinheiro_{form_version}")
+        dinheiro = _parse_money_input(st.text_input("Dinheiro", value="", placeholder="0,00", key=f"pag_dinheiro_{form_version}"))
     with c2:
-        pix = st.number_input("Pix", min_value=0.0, value=0.0, step=1.0, key=f"pag_pix_{form_version}")
+        pix = _parse_money_input(st.text_input("Pix", value="", placeholder="0,00", key=f"pag_pix_{form_version}"))
     with c3:
-        credito = st.number_input("Crédito", min_value=0.0, value=0.0, step=1.0, key=f"pag_credito_{form_version}")
+        credito = _parse_money_input(st.text_input("Crédito", value="", placeholder="0,00", key=f"pag_credito_{form_version}"))
     with c4:
-        debito = st.number_input("Débito", min_value=0.0, value=0.0, step=1.0, key=f"pag_debito_{form_version}")
+        debito = _parse_money_input(st.text_input("Débito", value="", placeholder="0,00", key=f"pag_debito_{form_version}"))
 
     pagamentos = [
         ("Dinheiro", dinheiro),
