@@ -14,6 +14,7 @@ from utils.dashboard_ui import page_banner, page_header
 from utils.permissions import has_permission
 from utils.pdf_os import generate_os_pdf
 from utils.quiosques import current_quiosque_id, scope_clause
+from utils.servicos import load_services, servico_label
 from views.clientes import create_cliente, load_clientes
 
 
@@ -1042,6 +1043,7 @@ def _mark_admin_notifications_read(conn):
 
 def _render_nova_os(conn):
     df_clientes = load_clientes(conn, somente_ativos=True)
+    df_servicos = load_services(conn, only_active=True)
     st.session_state.setdefault("nova_os_salvando", False)
 
     with st.expander("➕ Nova Ordem de Serviço", expanded=False):
@@ -1098,21 +1100,41 @@ def _render_nova_os(conn):
         salvar_cliente = cliente_id is None and st.checkbox("Salvar este cliente no cadastro", value=True)
 
         st.markdown("#### Aparelho e serviço")
+        servico_selecionado = None
+        if not df_servicos.empty:
+            service_options = {"Serviço manual": None}
+            service_options.update({
+                f"{servico_label(row)} | {row.categoria or 'Sem categoria'} | R$ {row.valor_padrao:.2f}": row.id
+                for row in df_servicos.itertuples()
+            })
+            selected_service = st.selectbox("Serviço cadastrado (opcional)", list(service_options.keys()), key="nova_os_servico_cadastrado")
+            selected_service_id = service_options[selected_service]
+            if selected_service_id:
+                servico_selecionado = df_servicos[df_servicos["id"] == selected_service_id].iloc[0]
+
+        default_servico = servico_label(servico_selecionado) if servico_selecionado is not None else ""
+        default_valor = float(servico_selecionado["valor_padrao"] or 0) if servico_selecionado is not None else 0.0
+        default_garantia = servico_selecionado["garantia"] if servico_selecionado is not None and servico_selecionado.get("garantia") else "30 dias"
+        default_obs = servico_selecionado["observacao"] if servico_selecionado is not None and servico_selecionado.get("observacao") else ""
+
         col1, col2, col3 = st.columns(3)
         with col1:
             marca = st.text_input("Marca")
-            valor = st.number_input("Valor", min_value=0.0)
+            valor = st.number_input("Valor", min_value=0.0, value=default_valor, key=f"nova_os_valor_{default_servico}")
         with col2:
             modelo = st.text_input("Modelo")
-            garantia = st.selectbox("Garantia", ["30 dias", "60 dias", "90 dias"])
+            garantia_options = ["30 dias", "60 dias", "90 dias"]
+            if default_garantia not in garantia_options:
+                garantia_options.append(default_garantia)
+            garantia = st.selectbox("Garantia", garantia_options, index=garantia_options.index(default_garantia), key=f"nova_os_garantia_{default_servico}")
         with col3:
             imei = st.text_input("IMEI")
             status = st.selectbox("Status", STATUS_OS)
 
         senha = st.text_input("Senha")
         defeito = st.text_area("Defeito Relatado")
-        servico = st.text_area("Serviço Realizado")
-        observacoes = st.text_area("Observações")
+        servico = st.text_area("Serviço Realizado", value=default_servico, key=f"nova_os_servico_texto_{default_servico}")
+        observacoes = st.text_area("Observações", value=default_obs, key=f"nova_os_obs_{default_servico}")
 
         if st.button("Salvar Ordem de Serviço", width="stretch", disabled=st.session_state["nova_os_salvando"]):
             if st.session_state["nova_os_salvando"]:
@@ -1120,6 +1142,9 @@ def _render_nova_os(conn):
 
             if not cliente.strip():
                 st.error("Informe o nome do cliente para salvar a OS.")
+                return
+            if servico_selecionado is not None and float(valor or 0) < default_valor - 0.01 and not observacoes.strip():
+                st.error("Informe o motivo do desconto nas observações.")
                 return
 
             try:

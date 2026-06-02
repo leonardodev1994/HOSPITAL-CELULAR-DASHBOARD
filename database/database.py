@@ -106,6 +106,7 @@ MIGRATIONS = [
     ("0006_estoque_planilha", "_migration_0006_estoque_planilha"),
     ("0007_cancelamento_vendas", "_migration_0007_cancelamento_vendas"),
     ("0008_indices_performance", "_migration_0008_indices_performance"),
+    ("0009_servicos_sangrias", "_migration_0009_servicos_sangrias"),
 ]
 
 
@@ -232,6 +233,14 @@ def _migration_0007_cancelamento_vendas(conn):
 
 def _migration_0008_indices_performance(conn):
     _create_performance_indexes(conn)
+
+
+def _migration_0009_servicos_sangrias(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_services_cash_schema(conn)
+        return
+
+    _create_sqlite_services_cash_schema(conn)
 
 
 def ensure_quiosques_schema(conn):
@@ -367,6 +376,37 @@ def _create_sqlite_schema(conn):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         data TEXT,
         valor_inicial REAL
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sangrias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+        valor REAL NOT NULL DEFAULT 0,
+        retirado_por TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        observacao TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS servicos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        categoria TEXT,
+        modelo TEXT,
+        valor_padrao REAL NOT NULL DEFAULT 0,
+        custo_estimado REAL,
+        tempo_estimado TEXT,
+        garantia TEXT,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        quiosque_id INTEGER,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
@@ -598,6 +638,37 @@ def _create_postgres_schema(conn):
         id SERIAL PRIMARY KEY,
         data TEXT,
         valor_inicial DOUBLE PRECISION
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sangrias (
+        id SERIAL PRIMARY KEY,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        valor DOUBLE PRECISION NOT NULL DEFAULT 0,
+        retirado_por TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        observacao TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS servicos (
+        id SERIAL PRIMARY KEY,
+        nome TEXT NOT NULL,
+        categoria TEXT,
+        modelo TEXT,
+        valor_padrao DOUBLE PRECISION NOT NULL DEFAULT 0,
+        custo_estimado DOUBLE PRECISION,
+        tempo_estimado TEXT,
+        garantia TEXT,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        quiosque_id INTEGER,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
@@ -955,6 +1026,79 @@ def _create_performance_indexes(conn):
     ]
     for query in indexes:
         cursor.execute(query)
+
+
+def _create_sqlite_services_cash_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sangrias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+        valor REAL NOT NULL DEFAULT 0,
+        retirado_por TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        observacao TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS servicos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        categoria TEXT,
+        modelo TEXT,
+        valor_padrao REAL NOT NULL DEFAULT 0,
+        custo_estimado REAL,
+        tempo_estimado TEXT,
+        garantia TEXT,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        quiosque_id INTEGER,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sangrias_quiosque_data ON sangrias(quiosque_id, data_hora)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_servicos_quiosque_ativo_nome ON servicos(quiosque_id, ativo, nome)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_servicos_modelo ON servicos(modelo)")
+
+
+def _create_postgres_services_cash_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sangrias (
+        id SERIAL PRIMARY KEY,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        valor DOUBLE PRECISION NOT NULL DEFAULT 0,
+        retirado_por TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        observacao TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS servicos (
+        id SERIAL PRIMARY KEY,
+        nome TEXT NOT NULL,
+        categoria TEXT,
+        modelo TEXT,
+        valor_padrao DOUBLE PRECISION NOT NULL DEFAULT 0,
+        custo_estimado DOUBLE PRECISION,
+        tempo_estimado TEXT,
+        garantia TEXT,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        quiosque_id INTEGER,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sangrias_quiosque_data ON sangrias(quiosque_id, data_hora)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_servicos_quiosque_ativo_nome ON servicos(quiosque_id, ativo, nome)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_servicos_modelo ON servicos(modelo)")
 
 
 def _seed_quiosques(cursor):

@@ -15,6 +15,7 @@ from views.lancamentos import render_lancamentos
 from views.lancamentos_cancelados import render_lancamentos_cancelados
 from views.novo_lancamento import render_novo_lancamento
 from views.ordem_servico import render_ordem_servico
+from views.servicos import render_servicos
 from views.usuarios import render_usuarios
 from utils.auth import current_user, logout, require_login
 from utils.permissions import MENU_PERMISSIONS, has_permission, visible_menu_items
@@ -68,6 +69,7 @@ MENU_ITEMS = {
     "Dashboard Mensal": render_dashboard_mensal,
     "Clientes": render_clientes,
     "Estoque": render_estoque,
+    "Serviços": render_servicos,
     "Novo Lançamento": render_novo_lancamento,
     "Lançamentos": render_lancamentos,
     "Lançamentos Cancelados": render_lancamentos_cancelados,
@@ -80,7 +82,7 @@ MENU_ITEMS = {
 
 MENU_GROUPS = {
     "Análise": ["Dashboard Geral", "Dashboard Diário", "Dashboard Mensal"],
-    "Operação": ["Clientes", "Estoque", "Novo Lançamento", "Lançamentos", "Ordem de Serviço"],
+    "Operação": ["Clientes", "Estoque", "Serviços", "Novo Lançamento", "Lançamentos", "Ordem de Serviço"],
     "Financeiro": ["Caixa Diário", "Lançamentos Cancelados", "Despesas"],
     "Sistema": ["Usuários/Funcionários", "Backup"],
 }
@@ -91,6 +93,7 @@ MENU_ICONS = {
     "Dashboard Mensal": ":material/calendar_month:",
     "Clientes": ":material/groups:",
     "Estoque": ":material/inventory_2:",
+    "Serviços": ":material/home_repair_service:",
     "Novo Lançamento": ":material/point_of_sale:",
     "Lançamentos": ":material/receipt_long:",
     "Lançamentos Cancelados": ":material/cancel:",

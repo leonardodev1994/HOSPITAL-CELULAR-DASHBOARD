@@ -10,6 +10,7 @@ from utils.dashboard_ui import moeda, page_banner
 from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
 from utils.quiosques import current_quiosque_id, scope_clause
 from utils.sales_authorization import can_directly_change_sale, validate_sale_authorization
+from utils.servicos import load_services, servico_label
 
 
 def _load_lancamentos(conn, data_inicio=None, data_fim=None, limit=100):
@@ -351,7 +352,7 @@ def _cart_table(items):
     rows = []
     for index, item in enumerate(items, start=1):
         diferenca = float(item.get("diferenca_preco") or 0)
-        if item["tipo"] == "Produto":
+        if item["tipo"] in {"Produto", "Serviço"} and item.get("preco_original") is not None:
             status_preco = "Acima do preço" if diferenca > 0.01 else "Com desconto" if diferenca < -0.01 else "Preço normal"
         else:
             status_preco = "-"
@@ -432,7 +433,8 @@ def _save_cart(conn, data, items, pagamentos, user=None):
         diferenca_preco = item.get("diferenca_preco")
         observacao_preco = item.get("observacao_alteracao_preco")
         usuario_responsavel = None if not user else user.get("nome")
-        data_hora_preco = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if item["tipo"] == "Produto" else None
+        has_reference_price = item.get("preco_original") is not None
+        data_hora_preco = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if has_reference_price else None
 
         lancamento_id = execute_insert_returning_id(conn, cursor, """
         INSERT INTO lancamentos (
@@ -462,10 +464,10 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             venda_id,
             current_quiosque_id(user),
             preco_original,
-            preco_vendido if item["tipo"] == "Produto" else None,
+            preco_vendido if has_reference_price else None,
             diferenca_preco,
             observacao_preco,
-            usuario_responsavel if item["tipo"] == "Produto" else None,
+            usuario_responsavel if has_reference_price else None,
             data_hora_preco,
         ))
         lancamento_ids.append(lancamento_id)
@@ -499,10 +501,10 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             item["valor_unitario"],
             _item_total(item),
             preco_original,
-            preco_vendido if item["tipo"] == "Produto" else None,
+            preco_vendido if has_reference_price else None,
             diferenca_preco,
             observacao_preco,
-            usuario_responsavel if item["tipo"] == "Produto" else None,
+            usuario_responsavel if has_reference_price else None,
             data_hora_preco,
             current_quiosque_id(user),
         ))
@@ -619,6 +621,7 @@ def _render_lancamento_action_dialog(conn, lancamento, user):
 
 def render_novo_lancamento(conn):
     df_estoque = load_stock(conn)
+    df_servicos = load_services(conn, only_active=True)
     items = _cart_items()
     user = current_user()
     st.session_state.setdefault("venda_salvando", False)
@@ -630,7 +633,7 @@ def render_novo_lancamento(conn):
     data = st.date_input("Data da venda", datetime.today(), key=f"venda_data_{form_version}")
 
     st.markdown("#### Adicionar itens")
-    tab_produto, tab_servico = st.tabs(["Produto do estoque", "Serviço manual"])
+    tab_produto, tab_servico_cadastrado, tab_servico = st.tabs(["Produto do estoque", "Serviço cadastrado", "Serviço manual"])
 
     with tab_produto:
         if df_estoque.empty:
@@ -704,6 +707,65 @@ def render_novo_lancamento(conn):
                         })
                         st.success("Produto adicionado à venda.")
                         st.rerun()
+
+    with tab_servico_cadastrado:
+        if df_servicos.empty:
+            st.info("Nenhum serviço cadastrado. Use serviço manual ou cadastre em Serviços.")
+        else:
+            options_servicos = {
+                f"{servico_label(row)} | {row.categoria or 'Sem categoria'} | R$ {row.valor_padrao:.2f}": row.id
+                for row in df_servicos.itertuples()
+            }
+            selected_service_label = st.selectbox("Serviço", list(options_servicos.keys()), key=f"cart_servico_cadastrado_{form_version}")
+            servico_id = options_servicos[selected_service_label]
+            servico_row = df_servicos[df_servicos["id"] == servico_id].iloc[0]
+            servico_desc = servico_label(servico_row)
+            valor_padrao = float(servico_row["valor_padrao"] or 0)
+            valor_padrao_text = "" if valor_padrao <= 0 else f"{valor_padrao:.2f}".replace(".", ",")
+            valor_servico_text = st.text_input(
+                "Valor da venda",
+                value=valor_padrao_text,
+                placeholder="Digite o valor",
+                key=f"cart_servico_cadastrado_valor_{servico_id}_{form_version}",
+            )
+            valor_servico = _parse_money_input(valor_servico_text)
+            diferenca_servico = valor_servico - valor_padrao
+            if abs(diferenca_servico) <= 0.01:
+                st.caption("Preço normal do cadastro.")
+            elif diferenca_servico > 0:
+                st.info(f"Cobrança acima do valor padrão em {moeda(diferenca_servico)}.")
+            else:
+                st.warning(f"Desconto de {moeda(abs(diferenca_servico))}.")
+
+            motivo_servico = st.text_input(
+                "Motivo da alteração de preço",
+                placeholder="Obrigatório se cobrar abaixo do valor padrão",
+                key=f"cart_servico_cadastrado_motivo_{servico_id}_{form_version}",
+            )
+            if servico_row.get("garantia"):
+                st.caption(f"Garantia: {servico_row['garantia']}")
+            if servico_row.get("observacao"):
+                st.caption(f"Obs.: {servico_row['observacao']}")
+
+            if st.button("Adicionar serviço cadastrado", width="stretch"):
+                if valor_servico <= 0:
+                    st.error("Informe o valor do serviço.")
+                elif diferenca_servico < -0.01 and not motivo_servico.strip():
+                    st.error("Informe o motivo do desconto.")
+                else:
+                    _add_cart_item({
+                        "tipo": "Serviço",
+                        "descricao": servico_desc,
+                        "produto_id": None,
+                        "quantidade": 1.0,
+                        "valor_unitario": float(valor_servico),
+                        "preco_original": valor_padrao,
+                        "preco_vendido": float(valor_servico),
+                        "diferenca_preco": diferenca_servico,
+                        "observacao_alteracao_preco": motivo_servico.strip() or servico_row.get("observacao") or "",
+                    })
+                    st.success("Serviço adicionado à venda.")
+                    st.rerun()
 
     with tab_servico:
         col1, col2, col3 = st.columns([2, 1, 1])
@@ -830,7 +892,7 @@ def render_novo_lancamento(conn):
             return
 
         for item in items:
-            if item["tipo"] == "Produto" and float(item.get("diferenca_preco") or 0) < -0.01:
+            if item["tipo"] in {"Produto", "Serviço"} and float(item.get("diferenca_preco") or 0) < -0.01:
                 if not str(item.get("observacao_alteracao_preco") or "").strip():
                     st.error("Informe o motivo do desconto.")
                     return
