@@ -65,6 +65,7 @@ MENU_PERMISSIONS = {
     "Dashboard Diário": "view_daily_sales",
     "Dashboard Mensal": "view_dashboard_monthly",
     "Clientes": None,
+    "Catálogo": "view_stock",
     "Estoque": "view_stock",
     "Serviços": "view_stock",
     "Novo Lançamento": "create_sales",

@@ -99,28 +99,28 @@ def render_dashboard_geral(conn):
 
     if not df_resumo.empty:
         st.divider()
-        top = pd.read_sql_query(
-            f"""
-            SELECT descricao, COALESCE(SUM(valor), 0) AS valor, COUNT(*) AS quantidade
-            FROM lancamentos
-            {where_lancamentos}
-            GROUP BY descricao
-            ORDER BY valor DESC
-            LIMIT 8
-            """,
-            conn,
-            params=params_lancamentos,
-        )
-        st.subheader("Itens mais relevantes")
-        st.dataframe(
-            top.rename(columns={
-                "descricao": "Descrição",
-                "valor": "Faturamento",
-                "quantidade": "Quantidade",
-            }),
-            width="stretch",
-            hide_index=True,
-            column_config={
-                "Faturamento": st.column_config.NumberColumn("Faturamento", format="R$ %.2f"),
-            },
-        )
+        with st.expander("Itens mais relevantes", expanded=False):
+            top = pd.read_sql_query(
+                f"""
+                SELECT descricao, COALESCE(SUM(valor), 0) AS valor, COUNT(*) AS quantidade
+                FROM lancamentos
+                {where_lancamentos}
+                GROUP BY descricao
+                ORDER BY valor DESC
+                LIMIT 8
+                """,
+                conn,
+                params=params_lancamentos,
+            )
+            st.dataframe(
+                top.rename(columns={
+                    "descricao": "Descrição",
+                    "valor": "Faturamento",
+                    "quantidade": "Quantidade",
+                }),
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "Faturamento": st.column_config.NumberColumn("Faturamento", format="R$ %.2f"),
+                },
+            )

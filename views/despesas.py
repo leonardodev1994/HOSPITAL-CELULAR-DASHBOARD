@@ -129,86 +129,87 @@ def render_despesas(conn):
 
     st.divider()
     st.subheader("Despesas cadastradas")
-    df_despesas = _load_despesas(conn)
-    if df_despesas.empty:
-        st.info("Nenhuma despesa cadastrada.")
-        return
+    with st.expander("Ver despesas cadastradas", expanded=False):
+        df_despesas = _load_despesas(conn)
+        if df_despesas.empty:
+            st.info("Nenhuma despesa cadastrada.")
+            return
 
-    quiosques = load_quiosques(conn) if user_can_view_all(user) else pd.DataFrame()
-    quiosque_options = {
-        int(row.id): row.nome
-        for row in quiosques.itertuples()
-    } if not quiosques.empty else {}
+        quiosques = load_quiosques(conn) if user_can_view_all(user) else pd.DataFrame()
+        quiosque_options = {
+            int(row.id): row.nome
+            for row in quiosques.itertuples()
+        } if not quiosques.empty else {}
 
-    for row in df_despesas.itertuples():
-        col_info, col_edit, col_delete = st.columns([7, 1, 1])
-        with col_info:
-            quiosque_label = f" · {row.quiosque_nome}" if row.quiosque_nome else ""
-            st.markdown(f"**{row.data}** · {row.descricao} · **{moeda(row.valor)}**{quiosque_label}")
+        for row in df_despesas.itertuples():
+            col_info, col_edit, col_delete = st.columns([7, 1, 1])
+            with col_info:
+                quiosque_label = f" · {row.quiosque_nome}" if row.quiosque_nome else ""
+                st.markdown(f"**{row.data}** · {row.descricao} · **{moeda(row.valor)}**{quiosque_label}")
 
-        with col_edit:
-            if is_admin and st.button("✏️", key=f"editar_despesa_{row.id}", help="Editar despesa"):
-                st.session_state["despesa_editando_id"] = row.id
-                st.session_state["despesa_excluir_id"] = None
-                st.rerun()
+            with col_edit:
+                if is_admin and st.button("✏️", key=f"editar_despesa_{row.id}", help="Editar despesa"):
+                    st.session_state["despesa_editando_id"] = row.id
+                    st.session_state["despesa_excluir_id"] = None
+                    st.rerun()
 
-        with col_delete:
-            if is_admin and st.button("🗑️", key=f"excluir_despesa_{row.id}", help="Excluir despesa"):
-                st.session_state["despesa_excluir_id"] = row.id
-                st.session_state["despesa_editando_id"] = None
-                st.rerun()
-
-        if st.session_state.get("despesa_editando_id") == row.id:
-            with st.container(border=True):
-                with st.form(f"editar_despesa_form_{row.id}"):
-                    edit_data = st.date_input("Data", value=pd.to_datetime(row.data).date(), key=f"despesa_data_{row.id}")
-                    edit_descricao = st.text_input("Descrição", value=row.descricao or "", key=f"despesa_desc_{row.id}")
-                    edit_valor = st.number_input("Valor", min_value=0.01, value=float(row.valor or 0), step=1.0, key=f"despesa_valor_{row.id}")
-                    if quiosque_options:
-                        ids = list(quiosque_options.keys())
-                        atual = int(row.quiosque_id or current_quiosque_id(user))
-                        if atual not in ids:
-                            atual = ids[0]
-                        edit_quiosque = st.selectbox(
-                            "Quiosque",
-                            ids,
-                            format_func=lambda value: quiosque_options[value],
-                            index=ids.index(atual),
-                            key=f"despesa_quiosque_{row.id}",
-                        )
-                    else:
-                        edit_quiosque = int(row.quiosque_id or current_quiosque_id(user))
-
-                    col_save, col_cancel = st.columns(2)
-                    with col_save:
-                        salvar_edicao = st.form_submit_button("Salvar edição")
-                    with col_cancel:
-                        cancelar_edicao = st.form_submit_button("Cancelar")
-
-                if cancelar_edicao:
+            with col_delete:
+                if is_admin and st.button("🗑️", key=f"excluir_despesa_{row.id}", help="Excluir despesa"):
+                    st.session_state["despesa_excluir_id"] = row.id
                     st.session_state["despesa_editando_id"] = None
                     st.rerun()
-                if salvar_edicao:
-                    try:
-                        _update_despesa(conn, row.id, edit_data, edit_descricao, edit_valor, edit_quiosque, user)
-                        st.session_state["despesa_editando_id"] = None
-                        st.success("Despesa atualizada.")
-                        st.rerun()
-                    except Exception as error:
-                        st.error(str(error))
 
-        if st.session_state.get("despesa_excluir_id") == row.id:
-            with st.container(border=True):
-                st.warning(f"Excluir despesa: {row.descricao} ({moeda(row.valor)})?")
-                confirmar = st.checkbox("Confirmo que quero excluir esta despesa", key=f"confirmar_excluir_despesa_{row.id}")
-                col_cancel, col_confirm = st.columns(2)
-                with col_cancel:
-                    if st.button("Cancelar", key=f"cancelar_excluir_despesa_{row.id}", width="stretch"):
-                        st.session_state["despesa_excluir_id"] = None
+            if st.session_state.get("despesa_editando_id") == row.id:
+                with st.container(border=True):
+                    with st.form(f"editar_despesa_form_{row.id}"):
+                        edit_data = st.date_input("Data", value=pd.to_datetime(row.data).date(), key=f"despesa_data_{row.id}")
+                        edit_descricao = st.text_input("Descrição", value=row.descricao or "", key=f"despesa_desc_{row.id}")
+                        edit_valor = st.number_input("Valor", min_value=0.01, value=float(row.valor or 0), step=1.0, key=f"despesa_valor_{row.id}")
+                        if quiosque_options:
+                            ids = list(quiosque_options.keys())
+                            atual = int(row.quiosque_id or current_quiosque_id(user))
+                            if atual not in ids:
+                                atual = ids[0]
+                            edit_quiosque = st.selectbox(
+                                "Quiosque",
+                                ids,
+                                format_func=lambda value: quiosque_options[value],
+                                index=ids.index(atual),
+                                key=f"despesa_quiosque_{row.id}",
+                            )
+                        else:
+                            edit_quiosque = int(row.quiosque_id or current_quiosque_id(user))
+
+                        col_save, col_cancel = st.columns(2)
+                        with col_save:
+                            salvar_edicao = st.form_submit_button("Salvar edição")
+                        with col_cancel:
+                            cancelar_edicao = st.form_submit_button("Cancelar")
+
+                    if cancelar_edicao:
+                        st.session_state["despesa_editando_id"] = None
                         st.rerun()
-                with col_confirm:
-                    if st.button("Excluir", key=f"confirmar_excluir_despesa_btn_{row.id}", width="stretch", disabled=not confirmar):
-                        _delete_despesa(conn, row._asdict(), user)
-                        st.session_state["despesa_excluir_id"] = None
-                        st.success("Despesa excluída.")
-                        st.rerun()
+                    if salvar_edicao:
+                        try:
+                            _update_despesa(conn, row.id, edit_data, edit_descricao, edit_valor, edit_quiosque, user)
+                            st.session_state["despesa_editando_id"] = None
+                            st.success("Despesa atualizada.")
+                            st.rerun()
+                        except Exception as error:
+                            st.error(str(error))
+
+            if st.session_state.get("despesa_excluir_id") == row.id:
+                with st.container(border=True):
+                    st.warning(f"Excluir despesa: {row.descricao} ({moeda(row.valor)})?")
+                    confirmar = st.checkbox("Confirmo que quero excluir esta despesa", key=f"confirmar_excluir_despesa_{row.id}")
+                    col_cancel, col_confirm = st.columns(2)
+                    with col_cancel:
+                        if st.button("Cancelar", key=f"cancelar_excluir_despesa_{row.id}", width="stretch"):
+                            st.session_state["despesa_excluir_id"] = None
+                            st.rerun()
+                    with col_confirm:
+                        if st.button("Excluir", key=f"confirmar_excluir_despesa_btn_{row.id}", width="stretch", disabled=not confirmar):
+                            _delete_despesa(conn, row._asdict(), user)
+                            st.session_state["despesa_excluir_id"] = None
+                            st.success("Despesa excluída.")
+                            st.rerun()

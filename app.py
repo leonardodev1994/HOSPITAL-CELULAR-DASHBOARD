@@ -5,6 +5,7 @@ from database.database import init_db, initialize_database
 from utils.backup import run_daily_auto_backup
 from views.caixa_diario import render_caixa_diario
 from views.backup import render_backup
+from views.catalogo import render_catalogo
 from views.clientes import render_clientes
 from views.dashboard_diario import render_dashboard_diario
 from views.dashboard_geral import render_dashboard_geral
@@ -68,6 +69,7 @@ MENU_ITEMS = {
     "Dashboard Diário": render_dashboard_diario,
     "Dashboard Mensal": render_dashboard_mensal,
     "Clientes": render_clientes,
+    "Catálogo": render_catalogo,
     "Estoque": render_estoque,
     "Serviços": render_servicos,
     "Novo Lançamento": render_novo_lancamento,
@@ -82,7 +84,7 @@ MENU_ITEMS = {
 
 MENU_GROUPS = {
     "Análise": ["Dashboard Geral", "Dashboard Diário", "Dashboard Mensal"],
-    "Operação": ["Clientes", "Estoque", "Serviços", "Novo Lançamento", "Lançamentos", "Ordem de Serviço"],
+    "Operação": ["Clientes", "Catálogo", "Estoque", "Serviços", "Novo Lançamento", "Lançamentos", "Ordem de Serviço"],
     "Financeiro": ["Caixa Diário", "Lançamentos Cancelados", "Despesas"],
     "Sistema": ["Usuários/Funcionários", "Backup"],
 }
@@ -92,6 +94,7 @@ MENU_ICONS = {
     "Dashboard Diário": ":material/monitoring:",
     "Dashboard Mensal": ":material/calendar_month:",
     "Clientes": ":material/groups:",
+    "Catálogo": ":material/search:",
     "Estoque": ":material/inventory_2:",
     "Serviços": ":material/home_repair_service:",
     "Novo Lançamento": ":material/point_of_sale:",

@@ -630,6 +630,23 @@ def render_novo_lancamento(conn):
 
     page_banner("tx_lancamento_banner.webp", "TX System - Novo Lançamento")
     st.subheader("➕ Novo Lançamento")
+
+    catalog_prefill = st.session_state.pop("catalogo_venda_prefill", None)
+    if catalog_prefill:
+        _add_cart_item({
+            "tipo": "Serviço",
+            "descricao": catalog_prefill["descricao"],
+            "produto_id": None,
+            "quantidade": 1.0,
+            "valor_unitario": float(catalog_prefill["valor"] or 0),
+            "preco_original": float(catalog_prefill["valor"] or 0),
+            "preco_vendido": float(catalog_prefill["valor"] or 0),
+            "diferenca_preco": 0,
+            "observacao_alteracao_preco": "Venda iniciada pelo catálogo",
+        })
+        st.success("Item do catálogo adicionado à venda.")
+        st.rerun()
+
     data = st.date_input("Data da venda", datetime.today(), key=f"venda_data_{form_version}")
 
     st.markdown("#### Adicionar itens")

@@ -107,6 +107,7 @@ MIGRATIONS = [
     ("0007_cancelamento_vendas", "_migration_0007_cancelamento_vendas"),
     ("0008_indices_performance", "_migration_0008_indices_performance"),
     ("0009_servicos_sangrias", "_migration_0009_servicos_sangrias"),
+    ("0010_catalogo_pecas", "_migration_0010_catalogo_pecas"),
 ]
 
 
@@ -241,6 +242,14 @@ def _migration_0009_servicos_sangrias(conn):
         return
 
     _create_sqlite_services_cash_schema(conn)
+
+
+def _migration_0010_catalogo_pecas(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_parts_catalog_schema(conn)
+        return
+
+    _create_sqlite_parts_catalog_schema(conn)
 
 
 def ensure_quiosques_schema(conn):
@@ -405,6 +414,21 @@ def _create_sqlite_schema(conn):
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
         quiosque_id INTEGER,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS catalogo_pecas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        marca TEXT,
+        modelo TEXT NOT NULL,
+        qualidade TEXT,
+        custo_sem_aro REAL,
+        custo_com_aro REAL,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
         atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
     )
@@ -667,6 +691,21 @@ def _create_postgres_schema(conn):
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
         quiosque_id INTEGER,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS catalogo_pecas (
+        id SERIAL PRIMARY KEY,
+        marca TEXT,
+        modelo TEXT NOT NULL,
+        qualidade TEXT,
+        custo_sem_aro DOUBLE PRECISION,
+        custo_com_aro DOUBLE PRECISION,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -1099,6 +1138,47 @@ def _create_postgres_services_cash_schema(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sangrias_quiosque_data ON sangrias(quiosque_id, data_hora)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_servicos_quiosque_ativo_nome ON servicos(quiosque_id, ativo, nome)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_servicos_modelo ON servicos(modelo)")
+
+
+def _create_sqlite_parts_catalog_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS catalogo_pecas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        marca TEXT,
+        modelo TEXT NOT NULL,
+        qualidade TEXT,
+        custo_sem_aro REAL,
+        custo_com_aro REAL,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_catalogo_pecas_busca ON catalogo_pecas(ativo, marca, modelo)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_catalogo_pecas_modelo ON catalogo_pecas(modelo)")
+
+
+def _create_postgres_parts_catalog_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS catalogo_pecas (
+        id SERIAL PRIMARY KEY,
+        marca TEXT,
+        modelo TEXT NOT NULL,
+        qualidade TEXT,
+        custo_sem_aro DOUBLE PRECISION,
+        custo_com_aro DOUBLE PRECISION,
+        observacao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_catalogo_pecas_busca ON catalogo_pecas(ativo, marca, modelo)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_catalogo_pecas_modelo ON catalogo_pecas(modelo)")
 
 
 def _seed_quiosques(cursor):

@@ -1045,8 +1045,12 @@ def _render_nova_os(conn):
     df_clientes = load_clientes(conn, somente_ativos=True)
     df_servicos = load_services(conn, only_active=True)
     st.session_state.setdefault("nova_os_salvando", False)
+    catalog_prefill = st.session_state.pop("catalogo_os_prefill", None)
+    if catalog_prefill:
+        st.session_state["nova_os_expandida"] = True
+        st.session_state["nova_os_servico_catalogo_prefill"] = catalog_prefill
 
-    with st.expander("➕ Nova Ordem de Serviço", expanded=False):
+    with st.expander("➕ Nova Ordem de Serviço", expanded=st.session_state.pop("nova_os_expandida", False)):
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -1100,6 +1104,7 @@ def _render_nova_os(conn):
         salvar_cliente = cliente_id is None and st.checkbox("Salvar este cliente no cadastro", value=True)
 
         st.markdown("#### Aparelho e serviço")
+        os_prefill = st.session_state.get("nova_os_servico_catalogo_prefill") or {}
         servico_selecionado = None
         if not df_servicos.empty:
             service_options = {"Serviço manual": None}
@@ -1112,17 +1117,17 @@ def _render_nova_os(conn):
             if selected_service_id:
                 servico_selecionado = df_servicos[df_servicos["id"] == selected_service_id].iloc[0]
 
-        default_servico = servico_label(servico_selecionado) if servico_selecionado is not None else ""
-        default_valor = float(servico_selecionado["valor_padrao"] or 0) if servico_selecionado is not None else 0.0
+        default_servico = os_prefill.get("servico") or (servico_label(servico_selecionado) if servico_selecionado is not None else "")
+        default_valor = float(os_prefill.get("valor") or (servico_selecionado["valor_padrao"] if servico_selecionado is not None else 0) or 0)
         default_garantia = servico_selecionado["garantia"] if servico_selecionado is not None and servico_selecionado.get("garantia") else "30 dias"
-        default_obs = servico_selecionado["observacao"] if servico_selecionado is not None and servico_selecionado.get("observacao") else ""
+        default_obs = os_prefill.get("observacao") or (servico_selecionado["observacao"] if servico_selecionado is not None and servico_selecionado.get("observacao") else "")
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            marca = st.text_input("Marca")
+            marca = st.text_input("Marca", value=os_prefill.get("marca", ""))
             valor = st.number_input("Valor", min_value=0.0, value=default_valor, key=f"nova_os_valor_{default_servico}")
         with col2:
-            modelo = st.text_input("Modelo")
+            modelo = st.text_input("Modelo", value=os_prefill.get("modelo", ""))
             garantia_options = ["30 dias", "60 dias", "90 dias"]
             if default_garantia not in garantia_options:
                 garantia_options.append(default_garantia)
