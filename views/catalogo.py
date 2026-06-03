@@ -8,6 +8,7 @@ from utils.catalogo import (
     catalog_import_template_excel,
     create_catalog_item,
     enrich_catalog_df,
+    load_imported_catalog_values,
     load_catalog_items,
     preview_catalog_import,
 )
@@ -131,6 +132,120 @@ def _render_catalog_import(conn, user):
                 "marca",
                 "modelo",
                 "qualidade",
+                "custo_sa",
+                "venda_sa",
+                "lucro_sa",
+                "custo_ca",
+                "venda_ca",
+                "lucro_ca",
+                "erro",
+            ]],
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "linha": st.column_config.NumberColumn("Linha", format="%d"),
+                "acao": "Ação",
+                "marca": "Marca",
+                "modelo": "Modelo",
+                "qualidade": "Qualidade",
+                "custo_sa": st.column_config.NumberColumn("custo_sa", format="R$ %.2f"),
+                "venda_sa": st.column_config.NumberColumn("venda_sa", format="R$ %.2f"),
+                "lucro_sa": st.column_config.NumberColumn("lucro_sa", format="R$ %.2f"),
+                "custo_ca": st.column_config.NumberColumn("custo_ca", format="R$ %.2f"),
+                "venda_ca": st.column_config.NumberColumn("venda_ca", format="R$ %.2f"),
+                "lucro_ca": st.column_config.NumberColumn("lucro_ca", format="R$ %.2f"),
+                "erro": "Validação",
+            },
+        )
+
+        with st.expander("Mapeamento técnico planilha → banco", expanded=False):
+            st.dataframe(
+                preview_df[[
+                    "linha",
+                    "marca",
+                    "modelo",
+                    "qualidade",
+                    "custo_sem_aro",
+                    "venda_sem_aro",
+                    "lucro_sem_aro",
+                    "custo_com_aro",
+                    "venda_com_aro",
+                    "lucro_com_aro",
+                ]],
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "linha": st.column_config.NumberColumn("Linha", format="%d"),
+                    "custo_sem_aro": st.column_config.NumberColumn("custo_sem_aro", format="R$ %.2f"),
+                    "venda_sem_aro": st.column_config.NumberColumn("venda_sem_aro", format="R$ %.2f"),
+                    "lucro_sem_aro": st.column_config.NumberColumn("lucro_sem_aro", format="R$ %.2f"),
+                    "custo_com_aro": st.column_config.NumberColumn("custo_com_aro", format="R$ %.2f"),
+                    "venda_com_aro": st.column_config.NumberColumn("venda_com_aro", format="R$ %.2f"),
+                    "lucro_com_aro": st.column_config.NumberColumn("lucro_com_aro", format="R$ %.2f"),
+                },
+            )
+
+        if summary["erro"] > 0:
+            st.warning("Corrija as linhas com erro antes de confirmar a importação.")
+            return
+
+        importable = summary["cadastrar"] + summary["atualizar"]
+        if importable <= 0:
+            st.info("Nenhum item válido para importar.")
+            return
+
+        confirmed = st.checkbox(
+            "Confirmo que revisei a prévia e quero importar/atualizar o catálogo.",
+            key="confirmar_importacao_catalogo",
+        )
+        if st.button("Confirmar importação", width="stretch", disabled=not confirmed):
+            result = apply_catalog_import(conn, preview_df, filename=uploaded_file.name, user=user)
+            saved_df = load_imported_catalog_values(conn, preview_df)
+            log_action(
+                conn,
+                user,
+                "importou_catalogo_pecas",
+                "catalogo_pecas",
+                None,
+                {
+                    "arquivo": uploaded_file.name,
+                    **result,
+                    "valores_salvos": saved_df.head(10).to_dict(orient="records") if not saved_df.empty else [],
+                },
+            )
+            st.success(
+                "Importação concluída: "
+                f"{result['cadastrados']} cadastrados, "
+                f"{result['atualizados']} atualizados, "
+                f"{result['ignorados']} ignorados."
+            )
+            if saved_df.empty:
+                st.warning("Importação registrada, mas nenhum item foi encontrado na validação pós-gravação.")
+            else:
+                st.caption("Validação pós-importação: valores lidos diretamente do banco.")
+                st.dataframe(
+                    saved_df,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "id": st.column_config.NumberColumn("id", format="%d"),
+                        "custo_sa": st.column_config.NumberColumn("custo_sa", format="R$ %.2f"),
+                        "venda_sa": st.column_config.NumberColumn("venda_sa", format="R$ %.2f"),
+                        "lucro_sa": st.column_config.NumberColumn("lucro_sa", format="R$ %.2f"),
+                        "custo_ca": st.column_config.NumberColumn("custo_ca", format="R$ %.2f"),
+                        "venda_ca": st.column_config.NumberColumn("venda_ca", format="R$ %.2f"),
+                        "lucro_ca": st.column_config.NumberColumn("lucro_ca", format="R$ %.2f"),
+                    },
+                )
+            return
+
+        st.dataframe(
+            preview_df[[
+                "linha",
+                "acao",
+                "marca",
+                "modelo",
+                "qualidade",
                 "custo_sem_aro",
                 "venda_sem_aro",
                 "lucro_sem_aro",
@@ -156,37 +271,6 @@ def _render_catalog_import(conn, user):
                 "erro": "Validação",
             },
         )
-
-        if summary["erro"] > 0:
-            st.warning("Corrija as linhas com erro antes de confirmar a importação.")
-            return
-
-        importable = summary["cadastrar"] + summary["atualizar"]
-        if importable <= 0:
-            st.info("Nenhum item válido para importar.")
-            return
-
-        confirmed = st.checkbox(
-            "Confirmo que revisei a prévia e quero importar/atualizar o catálogo.",
-            key="confirmar_importacao_catalogo",
-        )
-        if st.button("Confirmar importação", width="stretch", disabled=not confirmed):
-            result = apply_catalog_import(conn, preview_df, filename=uploaded_file.name, user=user)
-            log_action(
-                conn,
-                user,
-                "importou_catalogo_pecas",
-                "catalogo_pecas",
-                None,
-                {"arquivo": uploaded_file.name, **result},
-            )
-            st.success(
-                "Importação concluída: "
-                f"{result['cadastrados']} cadastrados, "
-                f"{result['atualizados']} atualizados, "
-                f"{result['ignorados']} ignorados."
-            )
-            st.rerun()
 
 
 def render_catalogo(conn):

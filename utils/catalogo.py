@@ -21,12 +21,20 @@ CATALOG_IMPORT_COLUMNS = [
     "Lucro C/A",
 ]
 
+CATALOG_PRICE_DB_COLUMNS = [
+    "custo_sem_aro",
+    "venda_sem_aro",
+    "lucro_sem_aro",
+    "custo_com_aro",
+    "venda_com_aro",
+    "lucro_com_aro",
+]
+
 _CATALOG_COLUMN_MAP = {
     "marca": "Marca",
     "modelo": "Modelo",
     "qualidade": "Qualidade",
     "custosa": "Custo S/A",
-    "custosemaro": "Custo S/A",
     "vendasa": "Venda S/A",
     "vendasemaro": "Venda S/A",
     "precosa": "Venda S/A",
@@ -45,6 +53,22 @@ _CATALOG_COLUMN_MAP = {
     "valorcomaro": "Venda C/A",
     "lucroca": "Lucro C/A",
     "lucrocomaro": "Lucro C/A",
+    "custosemar": "Custo S/A",
+    "custosem": "Custo S/A",
+    "vendasem": "Venda S/A",
+    "preco": "Venda S/A",
+    "valor": "Venda S/A",
+    "lucrosem": "Lucro S/A",
+    "custocom": "Custo C/A",
+    "custoc": "Custo C/A",
+    "vendacom": "Venda C/A",
+    "vendac": "Venda C/A",
+    "precocom": "Venda C/A",
+    "precoc": "Venda C/A",
+    "valorcom": "Venda C/A",
+    "valorc": "Venda C/A",
+    "lucrocom": "Lucro C/A",
+    "lucroc": "Lucro C/A",
 }
 
 
@@ -429,6 +453,12 @@ def preview_catalog_import(conn, uploaded_file):
             "marca": marca,
             "modelo": modelo,
             "qualidade": qualidade,
+            "custo_sa": custo_sem_aro,
+            "venda_sa": venda_sem_aro,
+            "lucro_sa": lucro_sem_aro,
+            "custo_ca": custo_com_aro,
+            "venda_ca": venda_com_aro,
+            "lucro_ca": lucro_com_aro,
             "custo_sem_aro": custo_sem_aro,
             "venda_sem_aro": venda_sem_aro,
             "lucro_sem_aro": lucro_sem_aro,
@@ -517,6 +547,58 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
 
     conn.commit()
     return result
+
+
+def load_imported_catalog_values(conn, preview_df, limit=50):
+    ensure_catalog_price_schema(conn)
+    rows = []
+    cursor = conn.cursor()
+
+    for row in preview_df.itertuples():
+        if row.acao not in {"cadastrar", "atualizar"}:
+            continue
+        cursor.execute("""
+        SELECT
+            id,
+            marca,
+            modelo,
+            qualidade,
+            custo_sem_aro,
+            venda_sem_aro,
+            lucro_sem_aro,
+            custo_com_aro,
+            venda_com_aro,
+            lucro_com_aro
+        FROM catalogo_pecas
+        WHERE COALESCE(marca, '') = ?
+          AND COALESCE(modelo, '') = ?
+          AND COALESCE(qualidade, '') = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """, (
+            str(row.marca or "").strip(),
+            str(row.modelo or "").strip(),
+            str(row.qualidade or "").strip(),
+        ))
+        saved = cursor.fetchone()
+        if not saved:
+            continue
+        rows.append({
+            "id": saved[0],
+            "marca": saved[1],
+            "modelo": saved[2],
+            "qualidade": saved[3],
+            "custo_sa": float(saved[4] or 0),
+            "venda_sa": float(saved[5] or 0),
+            "lucro_sa": float(saved[6] or 0),
+            "custo_ca": float(saved[7] or 0),
+            "venda_ca": float(saved[8] or 0),
+            "lucro_ca": float(saved[9] or 0),
+        })
+        if len(rows) >= int(limit):
+            break
+
+    return pd.DataFrame(rows)
 
 
 def enrich_catalog_df(df):
