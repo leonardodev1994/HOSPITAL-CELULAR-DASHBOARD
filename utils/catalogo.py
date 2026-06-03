@@ -1,7 +1,87 @@
+from io import BytesIO
+
 import pandas as pd
 
 
 MARCAS_PADRAO = ["Samsung", "Motorola", "Xiaomi", "iPhone", "LG", "Realme", "Infinix", "Asus", "Outras"]
+
+CATALOG_IMPORT_COLUMNS = [
+    "Marca",
+    "Modelo",
+    "Qualidade",
+    "Custo S/A",
+    "Venda S/A",
+    "Lucro S/A",
+    "Custo C/A",
+    "Venda C/A",
+    "Lucro C/A",
+]
+
+_CATALOG_COLUMN_MAP = {
+    "marca": "Marca",
+    "modelo": "Modelo",
+    "qualidade": "Qualidade",
+    "custo sa": "Custo S/A",
+    "custo s/a": "Custo S/A",
+    "venda sa": "Venda S/A",
+    "venda s/a": "Venda S/A",
+    "lucro sa": "Lucro S/A",
+    "lucro s/a": "Lucro S/A",
+    "custo ca": "Custo C/A",
+    "custo c/a": "Custo C/A",
+    "venda ca": "Venda C/A",
+    "venda c/a": "Venda C/A",
+    "lucro ca": "Lucro C/A",
+    "lucro c/a": "Lucro C/A",
+}
+
+
+def _normalize_column_name(value):
+    return (
+        str(value or "")
+        .strip()
+        .lower()
+        .replace("á", "a")
+        .replace("à", "a")
+        .replace("ã", "a")
+        .replace("â", "a")
+        .replace("é", "e")
+        .replace("ê", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ô", "o")
+        .replace("õ", "o")
+        .replace("ú", "u")
+        .replace("ç", "c")
+    )
+
+
+def _normalize_key(marca, modelo, qualidade):
+    return (
+        str(marca or "").strip().casefold(),
+        str(modelo or "").strip().casefold(),
+        str(qualidade or "").strip().casefold(),
+    )
+
+
+def _money_to_float(value):
+    if pd.isna(value) or value == "":
+        return 0.0
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    text = str(value).strip()
+    if not text:
+        return 0.0
+
+    text = text.replace("R$", "").replace(" ", "")
+    if "," in text and "." in text:
+        text = text.replace(".", "").replace(",", ".")
+    elif "," in text:
+        text = text.replace(",", ".")
+
+    return float(text)
 
 
 def preco_sugerido(custo):
@@ -88,6 +168,193 @@ def deactivate_catalog_item(conn, item_id):
     WHERE id = ?
     """, (int(item_id),))
     conn.commit()
+
+
+def catalog_import_template_excel():
+    sample = pd.DataFrame([{
+        "Marca": "iPhone",
+        "Modelo": "iPhone 11",
+        "Qualidade": "INCELL",
+        "Custo S/A": 120.0,
+        "Venda S/A": preco_sugerido(120.0),
+        "Lucro S/A": lucro_estimado(120.0),
+        "Custo C/A": 180.0,
+        "Venda C/A": preco_sugerido(180.0),
+        "Lucro C/A": lucro_estimado(180.0),
+    }])
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        sample.to_excel(writer, index=False, sheet_name="Catalogo")
+    output.seek(0)
+    return output.getvalue()
+
+
+def _read_catalog_import_excel(uploaded_file):
+    df = pd.read_excel(uploaded_file, engine="openpyxl")
+    df = df.dropna(how="all")
+
+    rename_map = {}
+    for column in df.columns:
+        normalized = _normalize_column_name(column)
+        if normalized in _CATALOG_COLUMN_MAP:
+            rename_map[column] = _CATALOG_COLUMN_MAP[normalized]
+
+    df = df.rename(columns=rename_map)
+    missing = [column for column in ["Marca", "Modelo", "Qualidade"] if column not in df.columns]
+    if missing:
+        raise ValueError("Colunas obrigatórias ausentes: " + ", ".join(missing))
+
+    for column in CATALOG_IMPORT_COLUMNS:
+        if column not in df.columns:
+            df[column] = ""
+
+    return df[CATALOG_IMPORT_COLUMNS].copy()
+
+
+def _existing_catalog_keys(conn):
+    existing = pd.read_sql_query(
+        """
+        SELECT id, marca, modelo, qualidade
+        FROM catalogo_pecas
+        """,
+        conn,
+    )
+    if existing.empty:
+        return {}
+
+    return {
+        _normalize_key(row.marca, row.modelo, row.qualidade): int(row.id)
+        for row in existing.itertuples()
+    }
+
+
+def preview_catalog_import(conn, uploaded_file):
+    df = _read_catalog_import_excel(uploaded_file)
+    existing = _existing_catalog_keys(conn)
+    seen = set()
+    rows = []
+    summary = {"cadastrar": 0, "atualizar": 0, "ignorar": 0, "erro": 0}
+
+    for index, row in df.iterrows():
+        line_number = int(index) + 2
+        marca = str(row.get("Marca") or "").strip()
+        modelo = str(row.get("Modelo") or "").strip()
+        qualidade = str(row.get("Qualidade") or "").strip()
+        erro = ""
+
+        if not modelo:
+            erro = "Informe o modelo."
+
+        try:
+            custo_sem_aro = _money_to_float(row.get("Custo S/A"))
+            custo_com_aro = _money_to_float(row.get("Custo C/A"))
+        except Exception:
+            custo_sem_aro = 0.0
+            custo_com_aro = 0.0
+            erro = "Custo inválido."
+
+        if custo_sem_aro < 0 or custo_com_aro < 0:
+            erro = "Custo não pode ser negativo."
+
+        key = _normalize_key(marca, modelo, qualidade)
+        if key == ("", "", ""):
+            action = "ignorar"
+            summary["ignorar"] += 1
+        elif erro:
+            action = "erro"
+            summary["erro"] += 1
+        elif key in seen:
+            action = "erro"
+            erro = "Duplicado na planilha."
+            summary["erro"] += 1
+        elif key in existing:
+            action = "atualizar"
+            summary["atualizar"] += 1
+        else:
+            action = "cadastrar"
+            summary["cadastrar"] += 1
+
+        if action not in {"ignorar", "erro"}:
+            seen.add(key)
+
+        rows.append({
+            "linha": line_number,
+            "acao": action,
+            "id_existente": existing.get(key),
+            "marca": marca,
+            "modelo": modelo,
+            "qualidade": qualidade,
+            "custo_sem_aro": custo_sem_aro,
+            "venda_sem_aro": preco_sugerido(custo_sem_aro),
+            "lucro_sem_aro": lucro_estimado(custo_sem_aro),
+            "custo_com_aro": custo_com_aro,
+            "venda_com_aro": preco_sugerido(custo_com_aro),
+            "lucro_com_aro": lucro_estimado(custo_com_aro),
+            "erro": erro,
+        })
+
+    return pd.DataFrame(rows), summary
+
+
+def apply_catalog_import(conn, preview_df, filename="", user=None):
+    cursor = conn.cursor()
+    result = {"cadastrados": 0, "atualizados": 0, "ignorados": 0}
+    user_name = (user or {}).get("usuario") or (user or {}).get("nome") or "sistema"
+    observation = f"Importado da planilha {filename} por {user_name}".strip()
+
+    for row in preview_df.itertuples():
+        if row.acao == "ignorar":
+            result["ignorados"] += 1
+            continue
+        if row.acao == "erro":
+            continue
+
+        if row.acao == "atualizar" and getattr(row, "id_existente", None):
+            cursor.execute("""
+            UPDATE catalogo_pecas
+            SET marca = ?,
+                modelo = ?,
+                qualidade = ?,
+                custo_sem_aro = ?,
+                custo_com_aro = ?,
+                observacao = ?,
+                ativo = 1,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """, (
+                row.marca,
+                row.modelo,
+                row.qualidade,
+                float(row.custo_sem_aro or 0),
+                float(row.custo_com_aro or 0),
+                observation,
+                int(row.id_existente),
+            ))
+            result["atualizados"] += 1
+            continue
+
+        cursor.execute("""
+        INSERT INTO catalogo_pecas (
+            marca,
+            modelo,
+            qualidade,
+            custo_sem_aro,
+            custo_com_aro,
+            observacao
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            row.marca,
+            row.modelo,
+            row.qualidade,
+            float(row.custo_sem_aro or 0),
+            float(row.custo_com_aro or 0),
+            observation,
+        ))
+        result["cadastrados"] += 1
+
+    conn.commit()
+    return result
 
 
 def enrich_catalog_df(df):
