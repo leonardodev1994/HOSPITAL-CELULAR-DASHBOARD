@@ -133,6 +133,7 @@ MIGRATIONS = [
     ("0008_indices_performance", "_migration_0008_indices_performance"),
     ("0009_servicos_sangrias", "_migration_0009_servicos_sangrias"),
     ("0010_catalogo_pecas", "_migration_0010_catalogo_pecas"),
+    ("0011_catalogo_precos", "_migration_0011_catalogo_precos"),
 ]
 
 
@@ -275,6 +276,14 @@ def _migration_0010_catalogo_pecas(conn):
         return
 
     _create_sqlite_parts_catalog_schema(conn)
+
+
+def _migration_0011_catalogo_precos(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_catalog_price_schema(conn)
+        return
+
+    _create_sqlite_catalog_price_schema(conn)
 
 
 def ensure_quiosques_schema(conn):
@@ -451,7 +460,11 @@ def _create_sqlite_schema(conn):
         modelo TEXT NOT NULL,
         qualidade TEXT,
         custo_sem_aro REAL,
+        venda_sem_aro REAL,
+        lucro_sem_aro REAL,
         custo_com_aro REAL,
+        venda_com_aro REAL,
+        lucro_com_aro REAL,
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -728,7 +741,11 @@ def _create_postgres_schema(conn):
         modelo TEXT NOT NULL,
         qualidade TEXT,
         custo_sem_aro DOUBLE PRECISION,
+        venda_sem_aro DOUBLE PRECISION,
+        lucro_sem_aro DOUBLE PRECISION,
         custo_com_aro DOUBLE PRECISION,
+        venda_com_aro DOUBLE PRECISION,
+        lucro_com_aro DOUBLE PRECISION,
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1174,7 +1191,11 @@ def _create_sqlite_parts_catalog_schema(conn):
         modelo TEXT NOT NULL,
         qualidade TEXT,
         custo_sem_aro REAL,
+        venda_sem_aro REAL,
+        lucro_sem_aro REAL,
         custo_com_aro REAL,
+        venda_com_aro REAL,
+        lucro_com_aro REAL,
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -1195,7 +1216,11 @@ def _create_postgres_parts_catalog_schema(conn):
         modelo TEXT NOT NULL,
         qualidade TEXT,
         custo_sem_aro DOUBLE PRECISION,
+        venda_sem_aro DOUBLE PRECISION,
+        lucro_sem_aro DOUBLE PRECISION,
         custo_com_aro DOUBLE PRECISION,
+        venda_com_aro DOUBLE PRECISION,
+        lucro_com_aro DOUBLE PRECISION,
         observacao TEXT,
         ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1204,6 +1229,69 @@ def _create_postgres_parts_catalog_schema(conn):
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_catalogo_pecas_busca ON catalogo_pecas(ativo, marca, modelo)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_catalogo_pecas_modelo ON catalogo_pecas(modelo)")
+
+
+def _create_sqlite_catalog_price_schema(conn):
+    cursor = conn.cursor()
+    for column in ["venda_sem_aro", "lucro_sem_aro", "venda_com_aro", "lucro_com_aro"]:
+        _add_column_if_missing(cursor, "catalogo_pecas", column, "REAL")
+
+    cursor.execute("""
+    UPDATE catalogo_pecas
+    SET
+        venda_sem_aro = CASE
+            WHEN COALESCE(venda_sem_aro, 0) > 0 THEN venda_sem_aro
+            WHEN COALESCE(custo_sem_aro, 0) > 0 THEN MAX(custo_sem_aro * 2, custo_sem_aro + 100)
+            ELSE 0
+        END,
+        lucro_sem_aro = CASE
+            WHEN COALESCE(lucro_sem_aro, 0) > 0 THEN lucro_sem_aro
+            WHEN COALESCE(custo_sem_aro, 0) > 0 THEN MAX(custo_sem_aro * 2, custo_sem_aro + 100) - custo_sem_aro
+            ELSE 0
+        END,
+        venda_com_aro = CASE
+            WHEN COALESCE(venda_com_aro, 0) > 0 THEN venda_com_aro
+            WHEN COALESCE(custo_com_aro, 0) > 0 THEN MAX(custo_com_aro * 2, custo_com_aro + 100)
+            ELSE 0
+        END,
+        lucro_com_aro = CASE
+            WHEN COALESCE(lucro_com_aro, 0) > 0 THEN lucro_com_aro
+            WHEN COALESCE(custo_com_aro, 0) > 0 THEN MAX(custo_com_aro * 2, custo_com_aro + 100) - custo_com_aro
+            ELSE 0
+        END
+    """)
+
+
+def _create_postgres_catalog_price_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    for column in ["venda_sem_aro", "lucro_sem_aro", "venda_com_aro", "lucro_com_aro"]:
+        _add_postgres_column_if_missing(cursor, "catalogo_pecas", column, "DOUBLE PRECISION")
+
+    cursor.execute("""
+    UPDATE catalogo_pecas
+    SET
+        venda_sem_aro = CASE
+            WHEN COALESCE(venda_sem_aro, 0) > 0 THEN venda_sem_aro
+            WHEN COALESCE(custo_sem_aro, 0) > 0 THEN GREATEST(custo_sem_aro * 2, custo_sem_aro + 100)
+            ELSE 0
+        END,
+        lucro_sem_aro = CASE
+            WHEN COALESCE(lucro_sem_aro, 0) > 0 THEN lucro_sem_aro
+            WHEN COALESCE(custo_sem_aro, 0) > 0 THEN GREATEST(custo_sem_aro * 2, custo_sem_aro + 100) - custo_sem_aro
+            ELSE 0
+        END,
+        venda_com_aro = CASE
+            WHEN COALESCE(venda_com_aro, 0) > 0 THEN venda_com_aro
+            WHEN COALESCE(custo_com_aro, 0) > 0 THEN GREATEST(custo_com_aro * 2, custo_com_aro + 100)
+            ELSE 0
+        END,
+        lucro_com_aro = CASE
+            WHEN COALESCE(lucro_com_aro, 0) > 0 THEN lucro_com_aro
+            WHEN COALESCE(custo_com_aro, 0) > 0 THEN GREATEST(custo_com_aro * 2, custo_com_aro + 100) - custo_com_aro
+            ELSE 0
+        END
+    """)
 
 
 def _seed_quiosques(cursor):

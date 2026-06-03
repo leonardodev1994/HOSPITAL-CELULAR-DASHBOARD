@@ -27,12 +27,20 @@ _CATALOG_COLUMN_MAP = {
     "custosemaro": "Custo S/A",
     "vendasa": "Venda S/A",
     "vendasemaro": "Venda S/A",
+    "precosa": "Venda S/A",
+    "precosemaro": "Venda S/A",
+    "valorsa": "Venda S/A",
+    "valorsemaro": "Venda S/A",
     "lucrosa": "Lucro S/A",
     "lucrosemaro": "Lucro S/A",
     "custoca": "Custo C/A",
     "custocomaro": "Custo C/A",
     "vendaca": "Venda C/A",
     "vendacomaro": "Venda C/A",
+    "precoca": "Venda C/A",
+    "precocomaro": "Venda C/A",
+    "valorca": "Venda C/A",
+    "valorcomaro": "Venda C/A",
     "lucroca": "Lucro C/A",
     "lucrocomaro": "Lucro C/A",
 }
@@ -42,6 +50,38 @@ def _normalize_column_name(value):
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(char for char in text if not unicodedata.combining(char))
     return re.sub(r"[^a-z0-9]+", "", text.strip().lower())
+
+
+def _catalog_column_from_name(column):
+    normalized = _normalize_column_name(column)
+    if normalized in _CATALOG_COLUMN_MAP:
+        return _CATALOG_COLUMN_MAP[normalized]
+
+    if normalized in {"sa", "semaro"}:
+        return "Custo S/A"
+    if normalized in {"ca", "comaro"}:
+        return "Custo C/A"
+
+    is_cost = any(token in normalized for token in ["custo", "cost"])
+    is_sale = any(token in normalized for token in ["venda", "preco", "price", "valor"])
+    is_profit = any(token in normalized for token in ["lucro", "profit", "margem"])
+    is_without_frame = "sa" in normalized or "semaro" in normalized
+    is_with_frame = "ca" in normalized or "comaro" in normalized
+
+    if is_cost and is_without_frame:
+        return "Custo S/A"
+    if is_sale and is_without_frame:
+        return "Venda S/A"
+    if is_profit and is_without_frame:
+        return "Lucro S/A"
+    if is_cost and is_with_frame:
+        return "Custo C/A"
+    if is_sale and is_with_frame:
+        return "Venda C/A"
+    if is_profit and is_with_frame:
+        return "Lucro C/A"
+
+    return None
 
 
 def _cell_to_text(value):
@@ -106,6 +146,21 @@ def _infer_cost(cost, sale, profit):
     return 0.0
 
 
+def _resolve_price_set(cost, sale, profit):
+    cost = _infer_cost(cost, sale, profit)
+    sale = float(sale or 0)
+    profit = float(profit or 0)
+
+    if cost > 0:
+        suggested_sale = preco_sugerido(cost)
+        return cost, suggested_sale, suggested_sale - cost
+
+    if sale > 0:
+        return 0.0, sale, profit if profit > 0 else 0.0
+
+    return 0.0, 0.0, 0.0
+
+
 def preco_sugerido(custo):
     custo = float(custo or 0)
     if custo <= 0:
@@ -139,7 +194,11 @@ def load_catalog_items(conn, search="", marca="", limit=80):
         modelo,
         qualidade,
         custo_sem_aro,
+        venda_sem_aro,
+        lucro_sem_aro,
         custo_com_aro,
+        venda_com_aro,
+        lucro_com_aro,
         observacao
     FROM catalogo_pecas
     WHERE """ + " AND ".join(filters) + """
@@ -159,6 +218,10 @@ def count_catalog_items(conn):
 def create_catalog_item(conn, marca, modelo, qualidade, custo_sem_aro, custo_com_aro, observacao=""):
     if not str(modelo or "").strip():
         raise ValueError("Informe o modelo.")
+    venda_sem_aro = preco_sugerido(custo_sem_aro)
+    lucro_sem_aro = lucro_estimado(custo_sem_aro)
+    venda_com_aro = preco_sugerido(custo_com_aro)
+    lucro_com_aro = lucro_estimado(custo_com_aro)
     cursor = conn.cursor()
     cursor.execute("""
     INSERT INTO catalogo_pecas (
@@ -166,16 +229,24 @@ def create_catalog_item(conn, marca, modelo, qualidade, custo_sem_aro, custo_com
         modelo,
         qualidade,
         custo_sem_aro,
+        venda_sem_aro,
+        lucro_sem_aro,
         custo_com_aro,
+        venda_com_aro,
+        lucro_com_aro,
         observacao
     )
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         str(marca or "").strip(),
         str(modelo or "").strip(),
         str(qualidade or "").strip(),
         float(custo_sem_aro or 0),
+        venda_sem_aro,
+        lucro_sem_aro,
         float(custo_com_aro or 0),
+        venda_com_aro,
+        lucro_com_aro,
         str(observacao or "").strip(),
     ))
     conn.commit()
@@ -217,11 +288,21 @@ def _read_catalog_import_excel(uploaded_file):
 
     rename_map = {}
     for column in df.columns:
-        normalized = _normalize_column_name(column)
-        if normalized in _CATALOG_COLUMN_MAP:
-            rename_map[column] = _CATALOG_COLUMN_MAP[normalized]
+        canonical = _catalog_column_from_name(column)
+        if canonical:
+            rename_map[column] = canonical
 
     df = df.rename(columns=rename_map)
+    df = df.loc[:, [column in CATALOG_IMPORT_COLUMNS for column in df.columns]]
+    if df.columns.duplicated().any():
+        collapsed = pd.DataFrame(index=df.index)
+        for column in CATALOG_IMPORT_COLUMNS:
+            matches = df.loc[:, df.columns == column]
+            if matches.empty:
+                continue
+            collapsed[column] = matches.bfill(axis=1).iloc[:, 0]
+        df = collapsed
+
     missing = [column for column in ["Marca", "Modelo", "Qualidade"] if column not in df.columns]
     if missing:
         raise ValueError("Colunas obrigatórias ausentes: " + ", ".join(missing))
@@ -268,17 +349,23 @@ def preview_catalog_import(conn, uploaded_file):
             erro = "Informe o modelo."
 
         try:
-            custo_sem_aro_raw = _money_to_float(row.get("Custo S/A"))
-            venda_sem_aro_importada = _money_to_float(row.get("Venda S/A"))
-            lucro_sem_aro_importado = _money_to_float(row.get("Lucro S/A"))
-            custo_com_aro_raw = _money_to_float(row.get("Custo C/A"))
-            venda_com_aro_importada = _money_to_float(row.get("Venda C/A"))
-            lucro_com_aro_importado = _money_to_float(row.get("Lucro C/A"))
-            custo_sem_aro = _infer_cost(custo_sem_aro_raw, venda_sem_aro_importada, lucro_sem_aro_importado)
-            custo_com_aro = _infer_cost(custo_com_aro_raw, venda_com_aro_importada, lucro_com_aro_importado)
+            custo_sem_aro, venda_sem_aro, lucro_sem_aro = _resolve_price_set(
+                _money_to_float(row.get("Custo S/A")),
+                _money_to_float(row.get("Venda S/A")),
+                _money_to_float(row.get("Lucro S/A")),
+            )
+            custo_com_aro, venda_com_aro, lucro_com_aro = _resolve_price_set(
+                _money_to_float(row.get("Custo C/A")),
+                _money_to_float(row.get("Venda C/A")),
+                _money_to_float(row.get("Lucro C/A")),
+            )
         except Exception:
             custo_sem_aro = 0.0
+            venda_sem_aro = 0.0
+            lucro_sem_aro = 0.0
             custo_com_aro = 0.0
+            venda_com_aro = 0.0
+            lucro_com_aro = 0.0
             erro = "Custo inválido."
 
         if custo_sem_aro < 0 or custo_com_aro < 0:
@@ -313,11 +400,11 @@ def preview_catalog_import(conn, uploaded_file):
             "modelo": modelo,
             "qualidade": qualidade,
             "custo_sem_aro": custo_sem_aro,
-            "venda_sem_aro": preco_sugerido(custo_sem_aro),
-            "lucro_sem_aro": lucro_estimado(custo_sem_aro),
+            "venda_sem_aro": venda_sem_aro,
+            "lucro_sem_aro": lucro_sem_aro,
             "custo_com_aro": custo_com_aro,
-            "venda_com_aro": preco_sugerido(custo_com_aro),
-            "lucro_com_aro": lucro_estimado(custo_com_aro),
+            "venda_com_aro": venda_com_aro,
+            "lucro_com_aro": lucro_com_aro,
             "erro": erro,
         })
 
@@ -344,7 +431,11 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
                 modelo = ?,
                 qualidade = ?,
                 custo_sem_aro = ?,
+                venda_sem_aro = ?,
+                lucro_sem_aro = ?,
                 custo_com_aro = ?,
+                venda_com_aro = ?,
+                lucro_com_aro = ?,
                 observacao = ?,
                 ativo = 1,
                 atualizado_em = CURRENT_TIMESTAMP
@@ -354,7 +445,11 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
                 row.modelo,
                 row.qualidade,
                 float(row.custo_sem_aro or 0),
+                float(row.venda_sem_aro or 0),
+                float(row.lucro_sem_aro or 0),
                 float(row.custo_com_aro or 0),
+                float(row.venda_com_aro or 0),
+                float(row.lucro_com_aro or 0),
                 observation,
                 int(row.id_existente),
             ))
@@ -367,16 +462,24 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
             modelo,
             qualidade,
             custo_sem_aro,
+            venda_sem_aro,
+            lucro_sem_aro,
             custo_com_aro,
+            venda_com_aro,
+            lucro_com_aro,
             observacao
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             row.marca,
             row.modelo,
             row.qualidade,
             float(row.custo_sem_aro or 0),
+            float(row.venda_sem_aro or 0),
+            float(row.lucro_sem_aro or 0),
             float(row.custo_com_aro or 0),
+            float(row.venda_com_aro or 0),
+            float(row.lucro_com_aro or 0),
             observation,
         ))
         result["cadastrados"] += 1
@@ -389,8 +492,29 @@ def enrich_catalog_df(df):
     if df.empty:
         return df
     result = df.copy()
-    result["venda_sem_aro"] = result["custo_sem_aro"].map(preco_sugerido)
-    result["lucro_sem_aro"] = result["venda_sem_aro"] - result["custo_sem_aro"].fillna(0)
-    result["venda_com_aro"] = result["custo_com_aro"].map(preco_sugerido)
-    result["lucro_com_aro"] = result["venda_com_aro"] - result["custo_com_aro"].fillna(0)
+    for column in [
+        "custo_sem_aro",
+        "venda_sem_aro",
+        "lucro_sem_aro",
+        "custo_com_aro",
+        "venda_com_aro",
+        "lucro_com_aro",
+    ]:
+        if column not in result.columns:
+            result[column] = 0.0
+        result[column] = pd.to_numeric(result[column], errors="coerce").fillna(0.0)
+
+    calculated_sale_without_frame = result["custo_sem_aro"].map(preco_sugerido)
+    result["venda_sem_aro"] = result["venda_sem_aro"].where(result["venda_sem_aro"] > 0, calculated_sale_without_frame)
+    result["lucro_sem_aro"] = result["lucro_sem_aro"].where(
+        result["lucro_sem_aro"] > 0,
+        result["venda_sem_aro"] - result["custo_sem_aro"],
+    )
+
+    calculated_sale_with_frame = result["custo_com_aro"].map(preco_sugerido)
+    result["venda_com_aro"] = result["venda_com_aro"].where(result["venda_com_aro"] > 0, calculated_sale_with_frame)
+    result["lucro_com_aro"] = result["lucro_com_aro"].where(
+        result["lucro_com_aro"] > 0,
+        result["venda_com_aro"] - result["custo_com_aro"],
+    )
     return result
