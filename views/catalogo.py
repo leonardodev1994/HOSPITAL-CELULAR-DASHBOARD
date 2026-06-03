@@ -24,12 +24,13 @@ def _item_valor(row, tipo_aro):
     return float(row.venda_com_aro if tipo_aro == "com" else row.venda_sem_aro or 0)
 
 
-def _render_catalog_results(conn, df):
+def _render_catalog_results(conn, df, key_prefix):
     if df.empty:
         st.info("Nenhum item encontrado.")
         return
 
     for row in enrich_catalog_df(df).itertuples():
+        widget_key = f"{key_prefix}_{row.id}"
         with st.container(border=True):
             st.markdown(f"**{row.marca or 'Sem marca'} · {row.modelo} · {row.qualidade or '-'}**")
             c1, c2, c3 = st.columns(3)
@@ -42,14 +43,14 @@ def _render_catalog_results(conn, df):
                 ["sem", "com"],
                 default="sem" if float(row.venda_sem_aro or 0) > 0 else "com",
                 format_func=lambda value: "Sem aro" if value == "sem" else "Com aro",
-                key=f"catalogo_aro_{row.id}",
+                key=f"catalogo_aro_{widget_key}",
             )
             valor = _item_valor(row, tipo_aro)
             descricao = _item_descricao(row, tipo_aro)
 
             a1, a2, a3 = st.columns(3)
             with a1:
-                if st.button("Criar orçamento", key=f"orcamento_{row.id}", width="stretch"):
+                if st.button("Criar orçamento", key=f"orcamento_{widget_key}", width="stretch"):
                     st.session_state["catalogo_orcamento"] = {
                         "descricao": descricao,
                         "marca": row.marca,
@@ -59,7 +60,7 @@ def _render_catalog_results(conn, df):
                     }
                     st.rerun()
             with a2:
-                if st.button("Abrir OS", key=f"abrir_os_catalogo_{row.id}", width="stretch"):
+                if st.button("Abrir OS", key=f"abrir_os_catalogo_{widget_key}", width="stretch"):
                     st.session_state["catalogo_os_prefill"] = {
                         "servico": descricao,
                         "marca": row.marca,
@@ -70,7 +71,7 @@ def _render_catalog_results(conn, df):
                     st.session_state["menu_atual"] = "Ordem de Serviço"
                     st.rerun()
             with a3:
-                if st.button("Lançar venda", key=f"venda_catalogo_{row.id}", width="stretch"):
+                if st.button("Lançar venda", key=f"venda_catalogo_{widget_key}", width="stretch"):
                     st.session_state["catalogo_venda_prefill"] = {
                         "descricao": descricao,
                         "valor": valor,
@@ -206,7 +207,7 @@ def render_catalogo(conn):
 
     search = st.text_input("🔎 Pesquisar modelo, marca ou qualidade", placeholder="Ex.: iPhone 11, A10, Redmi Note...")
     if search.strip():
-        _render_catalog_results(conn, load_catalog_items(conn, search=search, limit=40))
+        _render_catalog_results(conn, load_catalog_items(conn, search=search, limit=40), "busca")
     else:
         st.caption("Digite acima para busca rápida ou abra uma marca abaixo.")
 
@@ -240,4 +241,5 @@ def render_catalogo(conn):
     st.subheader("Marcas")
     for marca in MARCAS_PADRAO:
         with st.expander(marca, expanded=False):
-            _render_catalog_results(conn, load_catalog_items(conn, marca=marca, limit=60))
+            marca_key = marca.lower().replace(" ", "_")
+            _render_catalog_results(conn, load_catalog_items(conn, marca=marca, limit=60), f"marca_{marca_key}")
