@@ -17,11 +17,20 @@ def _get_database_url():
 
 
 class PostgresCursor:
-    def __init__(self, cursor):
+    TRANSACTION_STATUS_INERROR = 3
+
+    def __init__(self, cursor, conn):
         self._cursor = cursor
+        self._conn = conn
 
     def execute(self, query, params=None):
-        self._cursor.execute(_postgres_query(query), params)
+        if self._conn.get_transaction_status() == self.TRANSACTION_STATUS_INERROR:
+            self._conn.rollback()
+        try:
+            self._cursor.execute(_postgres_query(query), params)
+        except Exception:
+            self._conn.rollback()
+            raise
         return self
 
     def fetchone(self):
@@ -55,7 +64,7 @@ class PostgresConnection:
         self._conn = conn
 
     def cursor(self):
-        return PostgresCursor(self._conn.cursor())
+        return PostgresCursor(self._conn.cursor(), self._conn)
 
     def commit(self):
         return self._conn.commit()

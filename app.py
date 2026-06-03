@@ -43,6 +43,9 @@ def ensure_database_initialized():
     migration_conn = init_db()
     try:
         initialize_database(migration_conn)
+    except Exception:
+        st.cache_resource.clear()
+        raise
     finally:
         migration_conn.close()
     return True
