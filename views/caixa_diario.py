@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -23,10 +23,14 @@ def _pagamentos_do_dia(conn, data):
 
 def _sangrias_do_dia(conn, data):
     scope, params = scope_clause("s", prefix="AND")
+    inicio = datetime.strptime(data, "%Y-%m-%d")
+    fim = inicio + timedelta(days=1)
     if getattr(conn, "backend", "sqlite") == "postgres":
-        date_filter = "CAST(s.data_hora AS DATE) = CAST(? AS DATE)"
+        date_filter = "s.data_hora >= ? AND s.data_hora < ?"
+        date_params = (inicio, fim)
     else:
-        date_filter = "SUBSTR(CAST(s.data_hora AS TEXT), 1, 10) = ?"
+        date_filter = "s.data_hora >= ? AND s.data_hora < ?"
+        date_params = (inicio.strftime("%Y-%m-%d"), fim.strftime("%Y-%m-%d"))
 
     return pd.read_sql_query(f"""
     SELECT
@@ -43,7 +47,7 @@ def _sangrias_do_dia(conn, data):
     """ + scope + """
     ORDER BY s.data_hora DESC, s.id DESC
     LIMIT 100
-    """, conn, params=(data,) + params)
+    """, conn, params=date_params + params)
 
 
 def _registrar_sangria(conn, valor, retirado_por, observacao, user):
