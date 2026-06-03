@@ -286,6 +286,14 @@ def _migration_0011_catalogo_precos(conn):
     _create_sqlite_catalog_price_schema(conn)
 
 
+def ensure_catalog_price_schema(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_catalog_price_schema(conn)
+    else:
+        _create_sqlite_catalog_price_schema(conn)
+    conn.commit()
+
+
 def ensure_quiosques_schema(conn):
     if getattr(conn, "backend", "sqlite") == "postgres":
         _create_postgres_quiosque_schema(conn)

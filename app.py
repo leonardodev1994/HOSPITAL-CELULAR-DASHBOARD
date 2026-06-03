@@ -26,7 +26,7 @@ from utils.style import apply_style
 
 LOGO_PATH = Path("assets/branding/tx_logo_icon.png")
 ICON_PATH = Path("assets/branding/tx_logo_icon.png")
-APP_VERSION = "deploy-check-2026-05-30-125b267"
+APP_VERSION = "catalog-price-schema-2026-06-02"
 
 st.set_page_config(
     page_title="TX System",
@@ -39,7 +39,7 @@ apply_style()
 
 
 @st.cache_resource(show_spinner=False)
-def ensure_database_initialized():
+def ensure_database_initialized(app_version):
     migration_conn = init_db()
     try:
         initialize_database(migration_conn)
@@ -51,7 +51,7 @@ def ensure_database_initialized():
     return True
 
 
-ensure_database_initialized()
+ensure_database_initialized(APP_VERSION)
 
 
 def get_app_connection():

@@ -4,6 +4,8 @@ import unicodedata
 
 import pandas as pd
 
+from database.database import ensure_catalog_price_schema
+
 
 MARCAS_PADRAO = ["Samsung", "Motorola", "Xiaomi", "iPhone", "LG", "Realme", "Infinix", "Asus", "Outras"]
 
@@ -173,7 +175,34 @@ def lucro_estimado(custo):
     return preco_sugerido(custo) - custo if custo > 0 else 0.0
 
 
+def _catalog_table_columns(conn):
+    cursor = conn.cursor()
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        cursor.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'catalogo_pecas'
+            """
+        )
+        return {row[0] for row in cursor.fetchall()}
+
+    return {row[1] for row in cursor.execute("PRAGMA table_info(catalogo_pecas)").fetchall()}
+
+
+def _catalog_select_expr(column, available_columns):
+    if column in available_columns:
+        return column
+    return f"0 AS {column}"
+
+
 def load_catalog_items(conn, search="", marca="", limit=80):
+    available_columns = _catalog_table_columns(conn)
+    venda_sem_aro_expr = _catalog_select_expr("venda_sem_aro", available_columns)
+    lucro_sem_aro_expr = _catalog_select_expr("lucro_sem_aro", available_columns)
+    venda_com_aro_expr = _catalog_select_expr("venda_com_aro", available_columns)
+    lucro_com_aro_expr = _catalog_select_expr("lucro_com_aro", available_columns)
     filters = ["ativo = 1"]
     params = []
     if search.strip():
@@ -194,11 +223,11 @@ def load_catalog_items(conn, search="", marca="", limit=80):
         modelo,
         qualidade,
         custo_sem_aro,
-        venda_sem_aro,
-        lucro_sem_aro,
+        """ + venda_sem_aro_expr + """,
+        """ + lucro_sem_aro_expr + """,
         custo_com_aro,
-        venda_com_aro,
-        lucro_com_aro,
+        """ + venda_com_aro_expr + """,
+        """ + lucro_com_aro_expr + """,
         observacao
     FROM catalogo_pecas
     WHERE """ + " AND ".join(filters) + """
@@ -218,6 +247,7 @@ def count_catalog_items(conn):
 def create_catalog_item(conn, marca, modelo, qualidade, custo_sem_aro, custo_com_aro, observacao=""):
     if not str(modelo or "").strip():
         raise ValueError("Informe o modelo.")
+    ensure_catalog_price_schema(conn)
     venda_sem_aro = preco_sugerido(custo_sem_aro)
     lucro_sem_aro = lucro_estimado(custo_sem_aro)
     venda_com_aro = preco_sugerido(custo_com_aro)
@@ -412,6 +442,7 @@ def preview_catalog_import(conn, uploaded_file):
 
 
 def apply_catalog_import(conn, preview_df, filename="", user=None):
+    ensure_catalog_price_schema(conn)
     cursor = conn.cursor()
     result = {"cadastrados": 0, "atualizados": 0, "ignorados": 0}
     user_name = (user or {}).get("usuario") or (user or {}).get("nome") or "sistema"
