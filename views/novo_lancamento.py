@@ -8,7 +8,7 @@ from utils.audit import log_action
 from utils.auth import current_user
 from utils.dashboard_ui import moeda, page_banner
 from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
-from utils.quiosques import current_quiosque_id, scope_clause
+from utils.quiosques import current_quiosque_id, load_quiosques, scope_clause, user_can_view_all
 from utils.sales_authorization import can_directly_change_sale, validate_sale_authorization
 from utils.servicos import load_services, servico_label
 
@@ -157,16 +157,63 @@ def _sync_pagamentos_valor(conn, lancamento_id, novo_valor):
         cursor.execute("UPDATE pagamentos SET valor = ? WHERE id = ?", (novo_pagamento, pagamento_id))
 
 
-def _edit_lancamento(conn, lancamento, data, descricao, valor, motivo, logged_user, authorizer):
+def _sync_lancamento_quiosque(conn, lancamento, old_quiosque_id, new_quiosque_id):
+    if int(old_quiosque_id) == int(new_quiosque_id):
+        return
+
+    cursor = conn.cursor()
+    lancamento_id = int(lancamento["id"])
+    venda_id = lancamento.get("venda_id")
+    venda_item_id = lancamento.get("venda_item_id")
+
+    cursor.execute(
+        "UPDATE pagamentos SET quiosque_id = ? WHERE lancamento_id = ?",
+        (int(new_quiosque_id), lancamento_id),
+    )
+    cursor.execute(
+        "UPDATE estoque_movimentacoes SET quiosque_id = ? WHERE lancamento_id = ?",
+        (int(new_quiosque_id), lancamento_id),
+    )
+
+    if venda_item_id:
+        cursor.execute(
+            "UPDATE venda_itens SET quiosque_id = ? WHERE id = ?",
+            (int(new_quiosque_id), int(venda_item_id)),
+        )
+
+    if not venda_id:
+        return
+
+    other_quiosques = cursor.execute("""
+    SELECT DISTINCT quiosque_id
+    FROM lancamentos
+    WHERE venda_id = ?
+      AND id <> ?
+      AND COALESCE(status, 'Ativo') <> 'Cancelado'
+    """, (int(venda_id), lancamento_id)).fetchall()
+    other_quiosque_ids = {int(row[0] or 0) for row in other_quiosques}
+
+    if not other_quiosque_ids or other_quiosque_ids == {int(new_quiosque_id)}:
+        cursor.execute(
+            "UPDATE vendas SET quiosque_id = ? WHERE id = ?",
+            (int(new_quiosque_id), int(venda_id)),
+        )
+
+
+def _edit_lancamento(conn, lancamento, data, descricao, valor, motivo, logged_user, authorizer, quiosque_id=None):
     old = {
         "data": lancamento.get("data"),
         "descricao": lancamento.get("descricao"),
         "valor": lancamento.get("valor"),
+        "quiosque_id": lancamento.get("quiosque_id"),
     }
+    sale_quiosque_id = int(lancamento.get("quiosque_id") or current_quiosque_id())
+    new_quiosque_id = int(quiosque_id or sale_quiosque_id)
     new = {
         "data": str(data),
         "descricao": str(descricao or "").strip(),
         "valor": float(valor or 0),
+        "quiosque_id": new_quiosque_id,
     }
 
     if not new["descricao"]:
@@ -177,12 +224,12 @@ def _edit_lancamento(conn, lancamento, data, descricao, valor, motivo, logged_us
         raise ValueError("Informe o motivo da alteração.")
 
     cursor = conn.cursor()
-    sale_quiosque_id = int(lancamento.get("quiosque_id") or current_quiosque_id())
     cursor.execute("""
     UPDATE lancamentos
     SET data = ?,
         descricao = ?,
         valor = ?,
+        quiosque_id = ?,
         alterado_em = CURRENT_TIMESTAMP,
         alterado_por_id = ?,
         alterado_por_nome = ?,
@@ -193,6 +240,7 @@ def _edit_lancamento(conn, lancamento, data, descricao, valor, motivo, logged_us
         new["data"],
         new["descricao"],
         new["valor"],
+        new_quiosque_id,
         authorizer.get("id"),
         authorizer.get("nome"),
         authorizer.get("perfil"),
@@ -200,8 +248,10 @@ def _edit_lancamento(conn, lancamento, data, descricao, valor, motivo, logged_us
         int(lancamento["id"]),
         sale_quiosque_id,
     ))
+    _sync_lancamento_quiosque(conn, lancamento, sale_quiosque_id, new_quiosque_id)
     _sync_pagamentos_valor(conn, int(lancamento["id"]), new["valor"])
     _update_venda_status(conn, lancamento.get("venda_id"), sale_quiosque_id)
+    _update_venda_status(conn, lancamento.get("venda_id"), new_quiosque_id)
     conn.commit()
 
     log_action(conn, logged_user, "editou_lancamento", "lancamentos", int(lancamento["id"]), {
@@ -563,11 +613,28 @@ def _render_lancamento_action_dialog(conn, lancamento, user):
         nova_data = st.date_input("Data", value=pd.to_datetime(lancamento.get("data")).date())
         nova_descricao = st.text_input("Descrição", value=lancamento.get("descricao") or "")
         novo_valor = st.number_input("Valor", min_value=0.01, value=float(lancamento.get("valor") or 0), step=1.0)
+        novo_quiosque_id = sale_quiosque_id
+        if user_can_view_all(user):
+            quiosques = load_quiosques(conn)
+            options = {
+                int(row.id): row.nome
+                for row in quiosques.itertuples()
+            }
+            if sale_quiosque_id not in options:
+                options[sale_quiosque_id] = f"Quiosque {sale_quiosque_id}"
+            novo_quiosque_id = st.selectbox(
+                "Quiosque do lançamento",
+                list(options.keys()),
+                index=list(options.keys()).index(sale_quiosque_id),
+                format_func=lambda value: options[value],
+                help="Use para corrigir lançamento feito no quiosque errado.",
+            )
         motivo_label = "Motivo da alteração"
     else:
         nova_data = None
         nova_descricao = None
         novo_valor = None
+        novo_quiosque_id = sale_quiosque_id
         motivo_label = "Motivo do cancelamento"
         st.warning("O lançamento será marcado como cancelado, sem apagar o histórico.")
 
@@ -607,7 +674,17 @@ def _render_lancamento_action_dialog(conn, lancamento, user):
                         return
 
                 if is_edit:
-                    _edit_lancamento(conn, lancamento, nova_data, nova_descricao, novo_valor, motivo, user, authorizer)
+                    _edit_lancamento(
+                        conn,
+                        lancamento,
+                        nova_data,
+                        nova_descricao,
+                        novo_valor,
+                        motivo,
+                        user,
+                        authorizer,
+                        quiosque_id=novo_quiosque_id,
+                    )
                     st.success("Lançamento atualizado.")
                 else:
                     _cancel_lancamento(conn, lancamento, motivo, user, authorizer)
