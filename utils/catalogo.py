@@ -11,6 +11,7 @@ MARCAS_PADRAO = ["Samsung", "Motorola", "Xiaomi", "iPhone", "LG", "Realme", "Inf
 
 CATALOG_IMPORT_COLUMNS = [
     "Marca",
+    "Linha",
     "Modelo",
     "Qualidade",
     "Custo S/A",
@@ -19,6 +20,9 @@ CATALOG_IMPORT_COLUMNS = [
     "Custo C/A",
     "Venda C/A",
     "Lucro C/A",
+    "Fornecedor",
+    "Data Atualizacao",
+    "Observacao",
 ]
 
 CATALOG_PRICE_DB_COLUMNS = [
@@ -32,6 +36,7 @@ CATALOG_PRICE_DB_COLUMNS = [
 
 _CATALOG_COLUMN_MAP = {
     "marca": "Marca",
+    "linha": "Linha",
     "modelo": "Modelo",
     "qualidade": "Qualidade",
     "custosa": "Custo S/A",
@@ -69,6 +74,11 @@ _CATALOG_COLUMN_MAP = {
     "valorc": "Venda C/A",
     "lucrocom": "Lucro C/A",
     "lucroc": "Lucro C/A",
+    "fornecedor": "Fornecedor",
+    "dataatualizacao": "Data Atualizacao",
+    "dataatualizado": "Data Atualizacao",
+    "observacao": "Observacao",
+    "obs": "Observacao",
 }
 
 
@@ -319,26 +329,69 @@ def deactivate_catalog_item(conn, item_id):
 
 def catalog_import_template_excel():
     sample = pd.DataFrame([{
-        "Marca": "iPhone",
-        "Modelo": "iPhone 11",
+        "Marca": "Samsung",
+        "Linha": "A",
+        "Modelo": "A01",
         "Qualidade": "INCELL",
-        "Custo S/A": 120.0,
-        "Venda S/A": preco_sugerido(120.0),
-        "Lucro S/A": lucro_estimado(120.0),
-        "Custo C/A": 180.0,
-        "Venda C/A": preco_sugerido(180.0),
-        "Lucro C/A": lucro_estimado(180.0),
+        "Custo_SA": 60.0,
+        "Venda_SA": preco_sugerido(60.0),
+        "Lucro_SA": lucro_estimado(60.0),
+        "Custo_CA": 70.0,
+        "Venda_CA": preco_sugerido(70.0),
+        "Lucro_CA": lucro_estimado(70.0),
+        "Fornecedor": "TH CELL",
+        "Data_Atualizacao": "2026-06-03",
+        "Observacao": "",
     }])
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        sample.to_excel(writer, index=False, sheet_name="Catalogo")
+        sample.to_excel(writer, index=False, sheet_name="Catalogo_Importacao")
+        pd.DataFrame([
+            ["Regra principal", "Venda sugerida = maior valor entre custo x 2 e custo + R$100"],
+            ["Exemplo custo R$60", "Venda sugerida R$160"],
+            ["Colunas importantes", "Custo_SA/Venda_SA/Lucro_SA = tela sem aro"],
+            ["", "Custo_CA/Venda_CA/Lucro_CA = tela com aro"],
+        ]).to_excel(writer, index=False, header=False, sheet_name="Regras")
     output.seek(0)
     return output.getvalue()
 
 
+def _score_catalog_sheet(df):
+    canonical_columns = {
+        _catalog_column_from_name(column)
+        for column in df.columns
+    }
+    canonical_columns.discard(None)
+    required_score = sum(column in canonical_columns for column in ["Marca", "Modelo", "Qualidade"])
+    price_score = sum(
+        column in canonical_columns
+        for column in ["Custo S/A", "Venda S/A", "Custo C/A", "Venda C/A"]
+    )
+    return (required_score * 10) + price_score
+
+
 def _read_catalog_import_excel(uploaded_file):
-    df = pd.read_excel(uploaded_file, engine="openpyxl")
+    sheets = pd.read_excel(uploaded_file, engine="openpyxl", sheet_name=None)
+    if not sheets:
+        raise ValueError("Planilha sem abas para importar.")
+
+    preferred_sheet = None
+    for sheet_name in sheets:
+        if _normalize_column_name(sheet_name) == "catalogoimportacao":
+            preferred_sheet = sheet_name
+            break
+
+    if preferred_sheet is None:
+        preferred_sheet = max(sheets, key=lambda sheet_name: _score_catalog_sheet(sheets[sheet_name]))
+
+    df = sheets[preferred_sheet]
+    if _score_catalog_sheet(df) < 30:
+        raise ValueError(
+            "Não encontrei uma aba de catálogo válida. Use a aba Catalogo_Importacao com Marca, Modelo e Qualidade."
+        )
+
     df = df.dropna(how="all")
+    df.attrs["sheet_name"] = preferred_sheet
 
     rename_map = {}
     for column in df.columns:
@@ -365,7 +418,9 @@ def _read_catalog_import_excel(uploaded_file):
         if column not in df.columns:
             df[column] = ""
 
-    return df[CATALOG_IMPORT_COLUMNS].copy()
+    result = df[CATALOG_IMPORT_COLUMNS].copy()
+    result.attrs["sheet_name"] = preferred_sheet
+    return result
 
 
 def _existing_catalog_keys(conn):
@@ -390,13 +445,23 @@ def preview_catalog_import(conn, uploaded_file):
     existing = _existing_catalog_keys(conn)
     seen = set()
     rows = []
-    summary = {"cadastrar": 0, "atualizar": 0, "ignorar": 0, "erro": 0}
+    summary = {
+        "cadastrar": 0,
+        "atualizar": 0,
+        "ignorar": 0,
+        "erro": 0,
+        "aba": df.attrs.get("sheet_name", ""),
+    }
 
     for index, row in df.iterrows():
         line_number = int(index) + 2
         marca = _cell_to_text(row.get("Marca"))
+        linha = _cell_to_text(row.get("Linha"))
         modelo = _cell_to_text(row.get("Modelo"))
         qualidade = _cell_to_text(row.get("Qualidade"))
+        fornecedor = _cell_to_text(row.get("Fornecedor"))
+        data_atualizacao = _cell_to_text(row.get("Data Atualizacao"))
+        observacao_importada = _cell_to_text(row.get("Observacao"))
         erro = ""
 
         if not modelo:
@@ -451,8 +516,12 @@ def preview_catalog_import(conn, uploaded_file):
             "acao": action,
             "id_existente": existing.get(key),
             "marca": marca,
+            "linha_aparelho": linha,
             "modelo": modelo,
             "qualidade": qualidade,
+            "fornecedor": fornecedor,
+            "data_atualizacao": data_atualizacao,
+            "observacao_importada": observacao_importada,
             "custo_sa": custo_sem_aro,
             "venda_sa": venda_sem_aro,
             "lucro_sa": lucro_sem_aro,
@@ -476,7 +545,7 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
     cursor = conn.cursor()
     result = {"cadastrados": 0, "atualizados": 0, "ignorados": 0}
     user_name = (user or {}).get("usuario") or (user or {}).get("nome") or "sistema"
-    observation = f"Importado da planilha {filename} por {user_name}".strip()
+    base_observation = f"Importado da planilha {filename} por {user_name}".strip()
 
     for row in preview_df.itertuples():
         if row.acao == "ignorar":
@@ -484,6 +553,18 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
             continue
         if row.acao == "erro":
             continue
+
+        row_notes = [base_observation]
+        for label, attr in [
+            ("Linha", "linha_aparelho"),
+            ("Fornecedor", "fornecedor"),
+            ("Data", "data_atualizacao"),
+            ("Obs", "observacao_importada"),
+        ]:
+            value = str(getattr(row, attr, "") or "").strip()
+            if value:
+                row_notes.append(f"{label}: {value}")
+        observation = " | ".join(row_notes)
 
         if row.acao == "atualizar" and getattr(row, "id_existente", None):
             cursor.execute("""

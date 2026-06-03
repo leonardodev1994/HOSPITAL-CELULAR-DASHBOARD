@@ -125,13 +125,18 @@ def _render_catalog_import(conn, user):
         with m4:
             metric_card("Erros", summary["erro"], "Corrigir antes", "#EF4444")
 
+        if summary.get("aba"):
+            st.caption(f"Aba lida da planilha: {summary['aba']}")
+
         st.dataframe(
             preview_df[[
                 "linha",
                 "acao",
                 "marca",
+                "linha_aparelho",
                 "modelo",
                 "qualidade",
+                "fornecedor",
                 "custo_sa",
                 "venda_sa",
                 "lucro_sa",
@@ -146,8 +151,10 @@ def _render_catalog_import(conn, user):
                 "linha": st.column_config.NumberColumn("Linha", format="%d"),
                 "acao": "Ação",
                 "marca": "Marca",
+                "linha_aparelho": "Linha",
                 "modelo": "Modelo",
                 "qualidade": "Qualidade",
+                "fornecedor": "Fornecedor",
                 "custo_sa": st.column_config.NumberColumn("custo_sa", format="R$ %.2f"),
                 "venda_sa": st.column_config.NumberColumn("venda_sa", format="R$ %.2f"),
                 "lucro_sa": st.column_config.NumberColumn("lucro_sa", format="R$ %.2f"),
@@ -163,6 +170,8 @@ def _render_catalog_import(conn, user):
                 preview_df[[
                     "linha",
                     "marca",
+                    "linha_aparelho",
+                    "fornecedor",
                     "modelo",
                     "qualidade",
                     "custo_sem_aro",
