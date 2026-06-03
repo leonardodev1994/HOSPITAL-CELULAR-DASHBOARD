@@ -1,4 +1,6 @@
 from io import BytesIO
+import re
+import unicodedata
 
 import pandas as pd
 
@@ -21,39 +23,31 @@ _CATALOG_COLUMN_MAP = {
     "marca": "Marca",
     "modelo": "Modelo",
     "qualidade": "Qualidade",
-    "custo sa": "Custo S/A",
-    "custo s/a": "Custo S/A",
-    "venda sa": "Venda S/A",
-    "venda s/a": "Venda S/A",
-    "lucro sa": "Lucro S/A",
-    "lucro s/a": "Lucro S/A",
-    "custo ca": "Custo C/A",
-    "custo c/a": "Custo C/A",
-    "venda ca": "Venda C/A",
-    "venda c/a": "Venda C/A",
-    "lucro ca": "Lucro C/A",
-    "lucro c/a": "Lucro C/A",
+    "custosa": "Custo S/A",
+    "custosemaro": "Custo S/A",
+    "vendasa": "Venda S/A",
+    "vendasemaro": "Venda S/A",
+    "lucrosa": "Lucro S/A",
+    "lucrosemaro": "Lucro S/A",
+    "custoca": "Custo C/A",
+    "custocomaro": "Custo C/A",
+    "vendaca": "Venda C/A",
+    "vendacomaro": "Venda C/A",
+    "lucroca": "Lucro C/A",
+    "lucrocomaro": "Lucro C/A",
 }
 
 
 def _normalize_column_name(value):
-    return (
-        str(value or "")
-        .strip()
-        .lower()
-        .replace("á", "a")
-        .replace("à", "a")
-        .replace("ã", "a")
-        .replace("â", "a")
-        .replace("é", "e")
-        .replace("ê", "e")
-        .replace("í", "i")
-        .replace("ó", "o")
-        .replace("ô", "o")
-        .replace("õ", "o")
-        .replace("ú", "u")
-        .replace("ç", "c")
-    )
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", "", text.strip().lower())
+
+
+def _cell_to_text(value):
+    if pd.isna(value):
+        return ""
+    return str(value or "").strip()
 
 
 def _normalize_key(marca, modelo, qualidade):
@@ -75,13 +69,41 @@ def _money_to_float(value):
     if not text:
         return 0.0
 
-    text = text.replace("R$", "").replace(" ", "")
+    text = (
+        text.replace("R$", "")
+        .replace("\xa0", "")
+        .replace(" ", "")
+        .replace("\n", "")
+        .replace("\t", "")
+    )
+    text = re.sub(r"[^0-9,.\-]", "", text)
+    if not text or text in {"-", ".", ","}:
+        return 0.0
+
     if "," in text and "." in text:
         text = text.replace(".", "").replace(",", ".")
     elif "," in text:
         text = text.replace(",", ".")
+    elif text.count(".") > 1:
+        text = text.replace(".", "")
+    elif "." in text:
+        integer_part, decimal_part = text.rsplit(".", 1)
+        if len(decimal_part) == 3 and integer_part.replace("-", "").isdigit():
+            text = integer_part + decimal_part
 
     return float(text)
+
+
+def _infer_cost(cost, sale, profit):
+    cost = float(cost or 0)
+    sale = float(sale or 0)
+    profit = float(profit or 0)
+    if cost > 0:
+        return cost
+    if sale > 0 and profit > 0:
+        inferred = sale - profit
+        return inferred if inferred > 0 else 0.0
+    return 0.0
 
 
 def preco_sugerido(custo):
@@ -237,17 +259,23 @@ def preview_catalog_import(conn, uploaded_file):
 
     for index, row in df.iterrows():
         line_number = int(index) + 2
-        marca = str(row.get("Marca") or "").strip()
-        modelo = str(row.get("Modelo") or "").strip()
-        qualidade = str(row.get("Qualidade") or "").strip()
+        marca = _cell_to_text(row.get("Marca"))
+        modelo = _cell_to_text(row.get("Modelo"))
+        qualidade = _cell_to_text(row.get("Qualidade"))
         erro = ""
 
         if not modelo:
             erro = "Informe o modelo."
 
         try:
-            custo_sem_aro = _money_to_float(row.get("Custo S/A"))
-            custo_com_aro = _money_to_float(row.get("Custo C/A"))
+            custo_sem_aro_raw = _money_to_float(row.get("Custo S/A"))
+            venda_sem_aro_importada = _money_to_float(row.get("Venda S/A"))
+            lucro_sem_aro_importado = _money_to_float(row.get("Lucro S/A"))
+            custo_com_aro_raw = _money_to_float(row.get("Custo C/A"))
+            venda_com_aro_importada = _money_to_float(row.get("Venda C/A"))
+            lucro_com_aro_importado = _money_to_float(row.get("Lucro C/A"))
+            custo_sem_aro = _infer_cost(custo_sem_aro_raw, venda_sem_aro_importada, lucro_sem_aro_importado)
+            custo_com_aro = _infer_cost(custo_com_aro_raw, venda_com_aro_importada, lucro_com_aro_importado)
         except Exception:
             custo_sem_aro = 0.0
             custo_com_aro = 0.0
