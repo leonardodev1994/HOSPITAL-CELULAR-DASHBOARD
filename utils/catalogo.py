@@ -134,6 +134,10 @@ def _normalize_key(marca, modelo, qualidade):
     )
 
 
+def _key_params(marca, modelo, qualidade):
+    return _normalize_key(marca, modelo, qualidade)
+
+
 def _money_to_float(value):
     if pd.isna(value) or value == "":
         return 0.0
@@ -240,15 +244,15 @@ def load_catalog_items(conn, search="", marca="", limit=80):
     filters = ["ativo = 1"]
     params = []
     if search.strip():
-        term = f"%{search.strip()}%"
-        filters.append("(modelo LIKE ? OR marca LIKE ? OR qualidade LIKE ?)")
+        term = f"%{search.strip().casefold()}%"
+        filters.append("(LOWER(COALESCE(modelo, '')) LIKE ? OR LOWER(COALESCE(marca, '')) LIKE ? OR LOWER(COALESCE(qualidade, '')) LIKE ?)")
         params.extend([term, term, term])
     if marca and marca != "Outras":
-        filters.append("marca = ?")
-        params.append(marca)
+        filters.append("LOWER(COALESCE(marca, '')) = ?")
+        params.append(str(marca).casefold())
     elif marca == "Outras":
-        filters.append("(marca IS NULL OR marca = '' OR marca NOT IN (?, ?, ?, ?, ?, ?, ?, ?))")
-        params.extend(MARCAS_PADRAO[:-1])
+        filters.append("(marca IS NULL OR marca = '' OR LOWER(marca) NOT IN (?, ?, ?, ?, ?, ?, ?, ?))")
+        params.extend([brand.casefold() for brand in MARCAS_PADRAO[:-1]])
 
     query = """
     SELECT
@@ -265,7 +269,16 @@ def load_catalog_items(conn, search="", marca="", limit=80):
         observacao
     FROM catalogo_pecas
     WHERE """ + " AND ".join(filters) + """
-    ORDER BY marca, modelo, qualidade
+    ORDER BY
+        CASE
+            WHEN COALESCE(venda_sem_aro, 0) > 0 OR COALESCE(venda_com_aro, 0) > 0
+              OR COALESCE(custo_sem_aro, 0) > 0 OR COALESCE(custo_com_aro, 0) > 0
+            THEN 0 ELSE 1
+        END,
+        marca,
+        modelo,
+        qualidade,
+        id DESC
     LIMIT ?
     """
     return pd.read_sql_query(query, conn, params=tuple(params) + (int(limit),))
@@ -567,6 +580,7 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
         observation = " | ".join(row_notes)
 
         if row.acao == "atualizar" and getattr(row, "id_existente", None):
+            key_params = _key_params(row.marca, row.modelo, row.qualidade)
             cursor.execute("""
             UPDATE catalogo_pecas
             SET marca = ?,
@@ -581,7 +595,9 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
                 observacao = ?,
                 ativo = 1,
                 atualizado_em = CURRENT_TIMESTAMP
-            WHERE id = ?
+            WHERE LOWER(TRIM(COALESCE(marca, ''))) = ?
+              AND LOWER(TRIM(COALESCE(modelo, ''))) = ?
+              AND LOWER(TRIM(COALESCE(qualidade, ''))) = ?
             """, (
                 row.marca,
                 row.modelo,
@@ -593,7 +609,9 @@ def apply_catalog_import(conn, preview_df, filename="", user=None):
                 float(row.venda_com_aro or 0),
                 float(row.lucro_com_aro or 0),
                 observation,
-                int(row.id_existente),
+                key_params[0],
+                key_params[1],
+                key_params[2],
             ))
             result["atualizados"] += 1
             continue
@@ -638,6 +656,7 @@ def load_imported_catalog_values(conn, preview_df, limit=50):
     for row in preview_df.itertuples():
         if row.acao not in {"cadastrar", "atualizar"}:
             continue
+        key_params = _key_params(row.marca, row.modelo, row.qualidade)
         cursor.execute("""
         SELECT
             id,
@@ -651,16 +670,18 @@ def load_imported_catalog_values(conn, preview_df, limit=50):
             venda_com_aro,
             lucro_com_aro
         FROM catalogo_pecas
-        WHERE COALESCE(marca, '') = ?
-          AND COALESCE(modelo, '') = ?
-          AND COALESCE(qualidade, '') = ?
-        ORDER BY id DESC
+        WHERE LOWER(TRIM(COALESCE(marca, ''))) = ?
+          AND LOWER(TRIM(COALESCE(modelo, ''))) = ?
+          AND LOWER(TRIM(COALESCE(qualidade, ''))) = ?
+        ORDER BY
+            CASE
+                WHEN COALESCE(venda_sem_aro, 0) > 0 OR COALESCE(venda_com_aro, 0) > 0
+                  OR COALESCE(custo_sem_aro, 0) > 0 OR COALESCE(custo_com_aro, 0) > 0
+                THEN 0 ELSE 1
+            END,
+            id DESC
         LIMIT 1
-        """, (
-            str(row.marca or "").strip(),
-            str(row.modelo or "").strip(),
-            str(row.qualidade or "").strip(),
-        ))
+        """, key_params)
         saved = cursor.fetchone()
         if not saved:
             continue
