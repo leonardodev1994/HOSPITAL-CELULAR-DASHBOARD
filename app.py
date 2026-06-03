@@ -1,7 +1,7 @@
 import streamlit as st
 from pathlib import Path
 
-from database.database import init_db, initialize_database
+from database.database import init_db, initialize_database, recover_connection
 from utils.backup import run_daily_auto_backup
 from views.caixa_diario import render_caixa_diario
 from views.backup import render_backup
@@ -54,12 +54,12 @@ def ensure_database_initialized():
 ensure_database_initialized()
 
 
-@st.cache_resource(show_spinner=False)
 def get_app_connection():
     return init_db()
 
 
 conn = get_app_connection()
+recover_connection(conn)
 
 if not require_login(conn):
     st.stop()

@@ -28,8 +28,12 @@ class PostgresCursor:
             self._conn.rollback()
         try:
             self._cursor.execute(_postgres_query(query), params)
-        except Exception:
+        except Exception as error:
             self._conn.rollback()
+            if error.__class__.__name__ == "InFailedSqlTransaction":
+                self._cursor = self._conn.cursor()
+                self._cursor.execute(_postgres_query(query), params)
+                return self
             raise
         return self
 
@@ -64,6 +68,8 @@ class PostgresConnection:
         self._conn = conn
 
     def cursor(self):
+        if self._conn.get_transaction_status() == PostgresCursor.TRANSACTION_STATUS_INERROR:
+            self._conn.rollback()
         return PostgresCursor(self._conn.cursor(), self._conn)
 
     def commit(self):
@@ -104,6 +110,16 @@ def connect_postgres(database_url):
     else:
         raw_conn = psycopg2.connect(database_url, sslmode="require")
     return PostgresConnection(raw_conn)
+
+
+def recover_connection(conn):
+    if getattr(conn, "backend", "sqlite") != "postgres":
+        return
+
+    try:
+        conn.rollback()
+    except Exception:
+        pass
 
 
 MIGRATIONS = [

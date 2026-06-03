@@ -7,6 +7,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from database.database import recover_connection
+
 
 DEFAULT_ADMIN_USER = "admin"
 DEFAULT_ADMIN_PASSWORD = "admin123"
@@ -63,6 +65,7 @@ def verify_password(password, salt, password_hash):
 
 
 def ensure_default_admin(conn):
+    recover_connection(conn)
     cursor = conn.cursor()
     total_users = cursor.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
 
