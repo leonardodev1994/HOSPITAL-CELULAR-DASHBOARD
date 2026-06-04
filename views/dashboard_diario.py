@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.dashboard_ui import (
+    PLOTLY_CONFIG,
     bar_chart,
     empty_state,
     metric_card,
@@ -301,6 +302,7 @@ def render_dashboard_diario(conn):
             st.plotly_chart(
                 pie_chart(resumo_pag, "forma_pagamento", "valor", "Formas de pagamento"),
                 width="stretch",
+                config=PLOTLY_CONFIG,
             )
     with col2:
         top_itens = _resumo_top_itens(df_dia)
@@ -310,6 +312,7 @@ def render_dashboard_diario(conn):
             st.plotly_chart(
                 bar_chart(top_itens, "valor", "descricao", "Itens com maior faturamento"),
                 width="stretch",
+                config=PLOTLY_CONFIG,
             )
 
     _render_pagamentos_por_tipo(

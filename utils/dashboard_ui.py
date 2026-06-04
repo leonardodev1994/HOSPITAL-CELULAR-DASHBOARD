@@ -6,6 +6,7 @@ import streamlit as st
 
 
 CHART_COLORS = ["#E63946", "#16A34A", "#2563EB", "#F59E0B", "#64748B", "#0EA5E9"]
+PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "branding" / "tx_logo_icon.png"
 BRANDING_DIR = Path(__file__).resolve().parents[1] / "assets" / "branding"
 

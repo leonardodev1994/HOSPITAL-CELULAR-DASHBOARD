@@ -4,7 +4,7 @@ from datetime import timedelta
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import bar_chart, empty_state, metric_card, moeda, page_banner, page_header, pie_chart
+from utils.dashboard_ui import PLOTLY_CONFIG, bar_chart, empty_state, metric_card, moeda, page_banner, page_header, pie_chart
 from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause
 
@@ -158,11 +158,13 @@ def render_dashboard_mensal(conn):
         st.plotly_chart(
             bar_chart(diario, "dia", "valor", "Faturamento por dia"),
             width="stretch",
+            config=PLOTLY_CONFIG,
         )
     with col2:
         st.plotly_chart(
             pie_chart(tipo, "tipo", "valor", "Serviços x Produtos"),
             width="stretch",
+            config=PLOTLY_CONFIG,
         )
 
     st.divider()
@@ -186,4 +188,5 @@ def render_dashboard_mensal(conn):
         st.plotly_chart(
             bar_chart(top, "valor", "descricao", "Top itens"),
             width="stretch",
+            config=PLOTLY_CONFIG,
         )
