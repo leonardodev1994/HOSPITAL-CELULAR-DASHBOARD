@@ -138,6 +138,12 @@ def _key_params(marca, modelo, qualidade):
     return _normalize_key(marca, modelo, qualidade)
 
 
+def _search_terms(value):
+    normalized = unicodedata.normalize("NFKD", str(value or "").strip())
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    return [term for term in re.split(r"\s+", normalized.casefold()) if term]
+
+
 def _money_to_float(value):
     if pd.isna(value) or value == "":
         return 0.0
@@ -243,9 +249,15 @@ def load_catalog_items(conn, search="", marca="", limit=80):
     lucro_com_aro_expr = _catalog_select_expr("lucro_com_aro", available_columns)
     filters = ["ativo = 1"]
     params = []
-    if search.strip():
-        term = f"%{search.strip().casefold()}%"
-        filters.append("(LOWER(COALESCE(modelo, '')) LIKE ? OR LOWER(COALESCE(marca, '')) LIKE ? OR LOWER(COALESCE(qualidade, '')) LIKE ?)")
+    for search_term in _search_terms(search):
+        term = f"%{search_term}%"
+        filters.append(
+            "("
+            "LOWER(COALESCE(modelo, '')) LIKE ? "
+            "OR LOWER(COALESCE(marca, '')) LIKE ? "
+            "OR LOWER(COALESCE(qualidade, '')) LIKE ?"
+            ")"
+        )
         params.extend([term, term, term])
     if marca and marca != "Outras":
         filters.append("LOWER(COALESCE(marca, '')) = ?")
@@ -437,6 +449,7 @@ def _read_catalog_import_excel(uploaded_file):
 
 
 def _existing_catalog_keys(conn):
+    ensure_catalog_price_schema(conn)
     existing = pd.read_sql_query(
         """
         SELECT id, marca, modelo, qualidade
