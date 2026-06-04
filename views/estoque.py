@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+from utils.audit import log_action
 from utils.auth import current_user
 from utils.dashboard_ui import metric_card, moeda, page_banner, page_header
 from utils.permissions import has_permission
@@ -134,6 +135,10 @@ def _render_spreadsheet_tools(conn, df, user):
         )
         if st.button("Confirmar importação", width="stretch", disabled=not confirmed):
             result = apply_inventory_import(conn, preview_df, filename=uploaded_file.name, user=user)
+            log_action(conn, user, "importou_estoque", "estoque", None, {
+                "arquivo": uploaded_file.name,
+                **result,
+            })
             st.success(
                 "Importação concluída: "
                 f"{result['cadastrados']} cadastrados, "
@@ -219,7 +224,7 @@ def render_estoque(conn):
             if submitted and not st.session_state["estoque_salvando"]:
                 try:
                     st.session_state["estoque_salvando"] = True
-                    _, updated = add_stock_product(
+                    product_id, updated = add_stock_product(
                         conn,
                         produto,
                         modelo,
@@ -237,6 +242,20 @@ def render_estoque(conn):
                         st.success("✅ Produto já existia. A quantidade foi somada ao estoque.")
                     else:
                         st.success("✅ Produto cadastrado no estoque.")
+                    log_action(conn, user, "atualizou_produto_estoque" if updated else "criou_produto_estoque", "estoque", product_id, {
+                        "dados_novos": {
+                            "codigo": codigo,
+                            "produto": produto,
+                            "modelo": modelo,
+                            "categoria": categoria,
+                            "marca": marca,
+                            "quantidade": quantidade,
+                            "custo": custo,
+                            "valor_venda": valor_venda,
+                            "estoque_minimo": estoque_minimo,
+                            "fornecedor": fornecedor,
+                        },
+                    })
                     st.session_state["estoque_form_aberto"] = False
                     st.rerun()
                 except ValueError as error:
@@ -316,6 +335,30 @@ def render_estoque(conn):
                 if salvar_edit and not st.session_state["estoque_ajuste_salvando"]:
                     try:
                         st.session_state["estoque_ajuste_salvando"] = True
+                        old_data = {
+                            "codigo": row.codigo,
+                            "produto": row.produto,
+                            "modelo": row.modelo,
+                            "categoria": row.categoria,
+                            "marca": row.marca,
+                            "quantidade": row.quantidade,
+                            "custo": row.custo,
+                            "valor_venda": row.valor_venda,
+                            "estoque_minimo": row.estoque_minimo,
+                            "fornecedor": row.fornecedor,
+                        }
+                        new_data = {
+                            "codigo": codigo_edit,
+                            "produto": produto_edit,
+                            "modelo": modelo_edit,
+                            "categoria": categoria_edit,
+                            "marca": marca_edit,
+                            "quantidade": quantidade_edit,
+                            "custo": custo_edit,
+                            "valor_venda": valor_edit,
+                            "estoque_minimo": minimo_edit,
+                            "fornecedor": fornecedor_edit,
+                        }
                         update_stock_product(
                             conn,
                             row.id,
@@ -331,6 +374,10 @@ def render_estoque(conn):
                             custo=custo_edit,
                             fornecedor=fornecedor_edit,
                         )
+                        log_action(conn, user, "editou_produto_estoque", "estoque", row.id, {
+                            "dados_antigos": old_data,
+                            "dados_novos": new_data,
+                        })
                         st.session_state["estoque_editando_id"] = None
                         st.success("Produto atualizado.")
                         st.rerun()
@@ -351,6 +398,16 @@ def render_estoque(conn):
                 with c2:
                     if st.button("Inativar produto", key=f"inativar_produto_{row.id}", width="stretch", disabled=not confirmar):
                         deactivate_stock_product(conn, row.id)
+                        log_action(conn, user, "inativou_produto_estoque", "estoque", row.id, {
+                            "dados_antigos": {
+                                "produto": row.produto,
+                                "modelo": row.modelo,
+                                "categoria": row.categoria,
+                                "valor_venda": row.valor_venda,
+                                "custo": row.custo,
+                            },
+                            "dados_novos": {"ativo": 0},
+                        })
                         st.session_state["estoque_excluir_id"] = None
                         st.success("Produto inativado.")
                         st.rerun()

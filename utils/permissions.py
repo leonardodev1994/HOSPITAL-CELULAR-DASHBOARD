@@ -31,6 +31,7 @@ ROLE_PERMISSIONS = {
         "edit_financial_values",
         "manage_users",
         "manage_backup",
+        "view_audit",
         "export_financial_reports",
     },
     PROFILE_MANAGER: {
@@ -75,6 +76,7 @@ MENU_PERMISSIONS = {
     "Despesas": "view_expenses",
     "Ordem de Serviço": "create_os",
     "Usuários/Funcionários": "manage_users",
+    "Auditoria": "view_audit",
     "Backup": "manage_backup",
 }
 

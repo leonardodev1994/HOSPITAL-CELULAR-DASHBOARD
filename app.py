@@ -3,6 +3,7 @@ from pathlib import Path
 
 from database.database import init_db, initialize_database, recover_connection
 from utils.backup import run_daily_auto_backup
+from views.auditoria import render_auditoria
 from views.caixa_diario import render_caixa_diario
 from views.backup import render_backup
 from views.catalogo import render_catalogo
@@ -26,7 +27,7 @@ from utils.style import apply_style
 
 LOGO_PATH = Path("assets/branding/tx_logo_icon.png")
 ICON_PATH = Path("assets/branding/tx_logo_icon.png")
-APP_VERSION = "catalog-price-schema-2026-06-02"
+APP_VERSION = "audit-screen-2026-06-04"
 
 st.set_page_config(
     page_title="TX System",
@@ -82,6 +83,7 @@ MENU_ITEMS = {
     "Despesas": render_despesas,
     "Ordem de Serviço": render_ordem_servico,
     "Usuários/Funcionários": render_usuarios,
+    "Auditoria": render_auditoria,
     "Backup": render_backup,
 }
 
@@ -89,7 +91,7 @@ MENU_GROUPS = {
     "Análise": ["Dashboard Geral", "Dashboard Diário", "Dashboard Mensal"],
     "Operação": ["Clientes", "Catálogo", "Estoque", "Serviços", "Novo Lançamento", "Lançamentos", "Ordem de Serviço"],
     "Financeiro": ["Caixa Diário", "Lançamentos Cancelados", "Despesas"],
-    "Sistema": ["Usuários/Funcionários", "Backup"],
+    "Sistema": ["Usuários/Funcionários", "Auditoria", "Backup"],
 }
 
 MENU_ICONS = {
@@ -107,6 +109,7 @@ MENU_ICONS = {
     "Despesas": ":material/trending_down:",
     "Ordem de Serviço": ":material/build:",
     "Usuários/Funcionários": ":material/admin_panel_settings:",
+    "Auditoria": ":material/manage_search:",
     "Backup": ":material/cloud_upload:",
 }
 

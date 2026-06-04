@@ -120,7 +120,16 @@ def render_despesas(conn):
                 INSERT INTO despesas (data, descricao, valor, quiosque_id)
                 VALUES (?, ?, ?, ?)
                 """, (str(data_despesa), descricao, valor, current_quiosque_id()))
+                despesa_id = cursor.lastrowid if getattr(conn, "backend", "sqlite") != "postgres" else None
                 conn.commit()
+                log_action(conn, user, "criou_despesa", "despesas", despesa_id, {
+                    "dados_novos": {
+                        "data": str(data_despesa),
+                        "descricao": descricao,
+                        "valor": float(valor or 0),
+                        "quiosque_id": current_quiosque_id(),
+                    },
+                })
                 st.session_state["despesa_form_aberto"] = False
                 st.success("✅ Despesa salva!")
                 st.rerun()

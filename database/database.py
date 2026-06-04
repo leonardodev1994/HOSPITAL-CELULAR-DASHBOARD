@@ -134,6 +134,7 @@ MIGRATIONS = [
     ("0009_servicos_sangrias", "_migration_0009_servicos_sangrias"),
     ("0010_catalogo_pecas", "_migration_0010_catalogo_pecas"),
     ("0011_catalogo_precos", "_migration_0011_catalogo_precos"),
+    ("0012_auditoria_indices", "_migration_0012_auditoria_indices"),
 ]
 
 
@@ -284,6 +285,14 @@ def _migration_0011_catalogo_precos(conn):
         return
 
     _create_sqlite_catalog_price_schema(conn)
+
+
+def _migration_0012_auditoria_indices(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_audit_indexes(conn)
+        return
+
+    _create_sqlite_audit_indexes(conn)
 
 
 def ensure_catalog_price_schema(conn):
@@ -1300,6 +1309,27 @@ def _create_postgres_catalog_price_schema(conn):
             ELSE 0
         END
     """)
+
+
+def _create_sqlite_audit_indexes(conn):
+    cursor = conn.cursor()
+    _add_column_if_missing(cursor, "auditoria", "quiosque_id", "INTEGER")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_data_hora ON auditoria(data_hora)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_usuario_id ON auditoria(usuario_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_quiosque_id ON auditoria(quiosque_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_acao ON auditoria(acao)")
+
+
+def _create_postgres_audit_indexes(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    _add_postgres_column_if_missing(cursor, "auditoria", "quiosque_id", "INTEGER")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_data_hora ON auditoria(data_hora)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_usuario_id ON auditoria(usuario_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_quiosque_id ON auditoria(quiosque_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_acao ON auditoria(acao)")
 
 
 def _seed_quiosques(cursor):
