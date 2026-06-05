@@ -4,6 +4,7 @@ import streamlit as st
 from database.database import execute_insert_returning_id
 from utils.dashboard_ui import page_banner
 from utils.quiosques import current_quiosque_id, scope_clause
+from utils.text import search_matches
 
 
 def load_clientes(conn, somente_ativos=False):
@@ -233,11 +234,11 @@ def render_clientes(conn):
 
     df_filtrado = df_clientes.copy()
     if busca.strip():
-        termo = busca.strip().lower()
         filtro = (
-            df_filtrado["nome"].fillna("").str.lower().str.contains(termo)
-            | df_filtrado["cpf"].fillna("").str.lower().str.contains(termo)
-            | df_filtrado["telefone"].fillna("").str.lower().str.contains(termo)
+            df_filtrado["nome"].fillna("").map(lambda value: search_matches(value, busca))
+            | df_filtrado["cpf"].fillna("").map(lambda value: search_matches(value, busca))
+            | df_filtrado["telefone"].fillna("").map(lambda value: search_matches(value, busca))
+            | df_filtrado["email"].fillna("").map(lambda value: search_matches(value, busca))
         )
         df_filtrado = df_filtrado[filtro]
 

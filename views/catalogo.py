@@ -14,6 +14,7 @@ from utils.catalogo import (
 )
 from utils.dashboard_ui import metric_card, moeda, page_banner, page_header
 from utils.permissions import has_permission
+from utils.text import search_matches
 
 
 def _item_descricao(row, tipo_aro):
@@ -319,7 +320,24 @@ def render_catalogo(conn):
 
     search = st.text_input("🔎 Pesquisar modelo, marca ou qualidade", placeholder="Ex.: iPhone 11, A10, Redmi Note...")
     if search.strip():
-        _render_catalog_results(conn, load_catalog_items(conn, search=search, limit=40), "busca")
+        results = load_catalog_items(conn, search=search, limit=40)
+        if results.empty:
+            fallback = load_catalog_items(conn, limit=300)
+            if not fallback.empty:
+                results = fallback[
+                    fallback.apply(
+                        lambda row: search_matches(
+                            " ".join([
+                                str(row.get("marca") or ""),
+                                str(row.get("modelo") or ""),
+                                str(row.get("qualidade") or ""),
+                            ]),
+                            search,
+                        ),
+                        axis=1,
+                    )
+                ].head(40)
+        _render_catalog_results(conn, results, "busca")
     else:
         st.caption("Digite acima para busca rápida ou abra uma marca abaixo.")
 
