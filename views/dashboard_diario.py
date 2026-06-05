@@ -24,6 +24,33 @@ def _moeda(valor):
     return moeda(valor)
 
 
+def _render_meta_diaria(total, meta=1000):
+    percentual = (float(total or 0) / float(meta or 1)) * 100
+    progresso = min(percentual, 100)
+    diferenca = float(total or 0) - float(meta or 0)
+    if diferenca >= 0:
+        status = f"Meta batida! Excedeu {_moeda(diferenca)}"
+        accent = "#16A34A"
+    else:
+        status = f"Faltam {_moeda(abs(diferenca))} para bater a meta"
+        accent = "#E63946"
+
+    st.markdown(
+        f"""
+        <div class="daily-goal-card" style="--goal-accent:{accent}; --goal-progress:{progresso:.2f}%;">
+            <div class="daily-goal-head">
+                <span>Meta Diária</span>
+                <strong>{percentual:.0f}% concluído</strong>
+            </div>
+            <div class="daily-goal-value">{_moeda(total)} <small>/ {_moeda(meta)}</small></div>
+            <p>{status}</p>
+            <div class="daily-goal-track"><i></i></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _pagamentos_do_dia(conn, data):
     scope, params = scope_clause("lancamentos", prefix="AND")
     return pd.read_sql_query("""
@@ -257,13 +284,7 @@ def render_dashboard_diario(conn):
     diferenca = total - total_anterior
     diferenca_label = f"{_moeda(diferenca)} vs. dia anterior"
 
-    dinheiro = _total_por_forma(df_pagamentos, "Dinheiro")
-    pix = _total_por_forma(df_pagamentos, "Pix")
-    credito = _total_por_forma(df_pagamentos, "Crédito")
-    debito = _total_por_forma(df_pagamentos, "Débito")
-
     meta = 1000
-    progresso = min(total / meta, 1.0)
 
     cols = st.columns(4 if has_permission("view_profit") else 3)
     c1, c2, c3 = cols[:3]
@@ -279,17 +300,7 @@ def render_dashboard_diario(conn):
 
     st.divider()
 
-    col_meta, col_pag = st.columns([1, 2])
-    with col_meta:
-        st.subheader("Meta diária")
-        st.progress(progresso)
-        st.caption(f"{_moeda(total)} / {_moeda(meta)}")
-    with col_pag:
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Dinheiro", _moeda(dinheiro))
-        c2.metric("Pix", _moeda(pix))
-        c3.metric("Crédito", _moeda(credito))
-        c4.metric("Débito", _moeda(debito))
+    _render_meta_diaria(total, meta)
 
     st.divider()
 

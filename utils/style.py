@@ -2363,6 +2363,78 @@ def apply_style():
         box-shadow: none !important;
     }
 
+    .daily-goal-card {
+        width: 100%;
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-left: 5px solid var(--goal-accent, var(--accent-2));
+        border-radius: 16px;
+        padding: 22px 24px;
+        box-shadow: var(--shadow-soft);
+        margin: 0 0 4px;
+    }
+
+    .daily-goal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .daily-goal-head span {
+        color: var(--muted) !important;
+        font-size: .82rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .daily-goal-head strong {
+        color: var(--goal-accent, var(--accent-2)) !important;
+        font-size: .95rem;
+        font-weight: 900;
+    }
+
+    .daily-goal-value {
+        color: var(--text) !important;
+        font-size: clamp(1.8rem, 4vw, 2.7rem);
+        line-height: 1;
+        font-weight: 900;
+        letter-spacing: 0;
+        margin-bottom: 8px;
+    }
+
+    .daily-goal-value small {
+        color: var(--muted) !important;
+        font-size: clamp(.95rem, 2vw, 1.15rem);
+        font-weight: 800;
+    }
+
+    .daily-goal-card p {
+        color: var(--text) !important;
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0 0 16px;
+    }
+
+    .daily-goal-track {
+        height: 13px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #EEF2F7;
+        border: 1px solid #E5E7EB;
+    }
+
+    .daily-goal-track i {
+        display: block;
+        width: var(--goal-progress, 0%);
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--goal-accent, var(--accent-2)), #22C55E);
+        box-shadow: 0 0 18px rgba(22, 163, 74, .18);
+    }
+
     .section-panel {
         border-left: 4px solid var(--accent-2) !important;
     }
@@ -2478,6 +2550,17 @@ def apply_style():
             aspect-ratio: 2.5 / 1;
             border-radius: 14px;
             box-shadow: 0 14px 30px rgba(17, 24, 39, .13);
+        }
+
+        .daily-goal-card {
+            padding: 18px;
+            border-radius: 14px;
+        }
+
+        .daily-goal-head {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 6px;
         }
     }
     </style>
