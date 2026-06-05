@@ -25,19 +25,38 @@ def _item_valor(row, tipo_aro):
     return float(row.venda_com_aro if tipo_aro == "com" else row.venda_sem_aro or 0)
 
 
+def _show_catalog_costs_toggle(key_prefix):
+    state_key = "catalogo_mostrar_custo_lucro"
+    st.session_state.setdefault(state_key, False)
+    showing = st.session_state[state_key]
+    label = "Custo e lucro visíveis" if showing else "Custo e lucro ocultos"
+    icon = ":material/visibility:" if showing else ":material/visibility_off:"
+
+    if st.button(label, key=f"catalogo_toggle_custos_{key_prefix}", icon=icon):
+        st.session_state[state_key] = not showing
+        st.rerun()
+
+    return st.session_state[state_key]
+
+
 def _render_catalog_results(conn, df, key_prefix):
     if df.empty:
         st.info("Nenhum item encontrado.")
         return
+
+    show_costs = _show_catalog_costs_toggle(key_prefix)
 
     for row in enrich_catalog_df(df).itertuples():
         widget_key = f"{key_prefix}_{row.id}"
         with st.container(border=True):
             st.markdown(f"**{row.marca or 'Sem marca'} · {row.modelo} · {row.qualidade or '-'}**")
             c1, c2, c3 = st.columns(3)
-            c1.metric("S/A", moeda(row.venda_sem_aro), f"Custo {moeda(row.custo_sem_aro)}")
-            c2.metric("C/A", moeda(row.venda_com_aro), f"Custo {moeda(row.custo_com_aro)}")
-            c3.metric("Lucro melhor", moeda(max(row.lucro_sem_aro, row.lucro_com_aro)))
+            custo_sa = f"Custo {moeda(row.custo_sem_aro)}" if show_costs else "Custo oculto"
+            custo_ca = f"Custo {moeda(row.custo_com_aro)}" if show_costs else "Custo oculto"
+            lucro = moeda(max(row.lucro_sem_aro, row.lucro_com_aro)) if show_costs else "••••"
+            c1.metric("S/A", moeda(row.venda_sem_aro), custo_sa)
+            c2.metric("C/A", moeda(row.venda_com_aro), custo_ca)
+            c3.metric("Lucro melhor", lucro)
 
             tipo_aro = st.segmented_control(
                 "Opção",
