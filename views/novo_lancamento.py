@@ -753,10 +753,11 @@ def render_novo_lancamento(conn):
                     placeholder="Ex.: pelicula, cabo tipo c, iphone 11",
                     key=f"cart_produto_busca_{form_version}",
                 )
-                produtos_filtrados = produtos_disponiveis.copy()
-                if busca_produto.strip():
-                    produtos_filtrados = produtos_filtrados[
-                        produtos_filtrados.apply(
+                if not busca_produto.strip():
+                    st.caption("Digite para pesquisar. Nenhum produto fica selecionado automaticamente.")
+                else:
+                    produtos_filtrados = produtos_disponiveis[
+                        produtos_disponiveis.apply(
                             lambda row: search_matches(
                                 " ".join([
                                     str(row.get("produto") or ""),
@@ -771,78 +772,88 @@ def render_novo_lancamento(conn):
                         )
                     ]
 
-                if produtos_filtrados.empty:
-                    st.info("Nenhum produto encontrado para essa busca.")
-                else:
-                    options = {
-                        f"{produto_label(row)} | Qtd: {row.quantidade:g} | R$ {row.valor_venda:.2f}": row.id
-                        for row in produtos_filtrados.head(30).itertuples()
-                    }
-                    selected_label = st.selectbox("Produto encontrado", list(options.keys()), key=f"cart_produto_{form_version}")
-                    produto_id = options[selected_label]
-                    produto = produtos_filtrados[produtos_filtrados["id"] == produto_id].iloc[0]
-                    descricao = produto_label(produto)
-                    max_qtd = float(produto["quantidade"])
-                    preco_cadastrado = float(produto["valor_venda"] or 0)
-
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        quantidade = st.number_input(
-                            "Quantidade",
-                            min_value=1.0,
-                            max_value=max_qtd,
-                            value=1.0,
-                            step=1.0,
-                            key=f"cart_produto_quantidade_{produto_id}_{form_version}",
-                        )
-                    with col2:
-                        valor_padrao = "" if preco_cadastrado <= 0 else f"{preco_cadastrado:.2f}".replace(".", ",")
-                        valor_unitario_text = st.text_input(
-                            "Valor da venda",
-                            value=valor_padrao,
-                            placeholder="Digite o valor",
-                            key=f"cart_produto_valor_{produto_id}_{form_version}",
-                        )
-                        valor_unitario = _parse_money_input(valor_unitario_text)
-
-                    diferenca_preco = float(valor_unitario) - preco_cadastrado
-                    if abs(diferenca_preco) <= 0.01:
-                        st.caption("Preço normal do cadastro.")
-                    elif diferenca_preco > 0:
-                        st.info(f"Venda acima do preço cadastrado em {moeda(diferenca_preco)} por unidade.")
+                    if produtos_filtrados.empty:
+                        st.info("Nenhum produto encontrado para essa busca.")
                     else:
-                        st.warning(f"Desconto de {moeda(abs(diferenca_preco))} por unidade.")
-
-                    observacao_preco = st.text_input(
-                        "Motivo da alteração de preço",
-                        placeholder="Obrigatório se vender abaixo do preço cadastrado",
-                        key=f"cart_produto_motivo_preco_{produto_id}_{form_version}",
-                    )
-
-                    if st.button("Adicionar produto", width="stretch", disabled=st.session_state["produto_adicionando"]):
-                        if valor_unitario <= 0:
-                            st.error("Informe o valor unitário do produto.")
-                        elif diferenca_preco < -0.01 and not observacao_preco.strip():
-                            st.error("Informe o motivo do desconto.")
-                        elif _cart_has_same_product(produto_id):
-                            st.warning("Este produto já está na lista de itens adicionados.")
+                        options = {
+                            "Selecione um produto": None,
+                            **{
+                                f"{produto_label(row)} | Qtd: {row.quantidade:g} | R$ {row.valor_venda:.2f}": row.id
+                                for row in produtos_filtrados.head(30).itertuples()
+                            },
+                        }
+                        selected_label = st.selectbox(
+                            "Produto encontrado",
+                            list(options.keys()),
+                            key=f"cart_produto_{form_version}",
+                        )
+                        produto_id = options[selected_label]
+                        if produto_id is None:
+                            st.caption("Selecione conscientemente um produto para liberar a adição.")
                         else:
-                            st.session_state["produto_adicionando"] = True
-                            _add_cart_item({
-                                "tipo": "Produto",
-                                "descricao": descricao,
-                                "produto_id": int(produto_id),
-                                "quantidade": float(quantidade),
-                                "valor_unitario": float(valor_unitario),
-                                "preco_original": preco_cadastrado,
-                                "preco_vendido": float(valor_unitario),
-                                "diferenca_preco": diferenca_preco,
-                                "observacao_alteracao_preco": observacao_preco.strip(),
-                            })
-                            st.session_state["produto_adicionando"] = False
-                            st.session_state["produto_adicionado_msg"] = True
-                            st.session_state["novo_lancamento_form_version"] += 1
-                            st.rerun()
+                            produto = produtos_filtrados[produtos_filtrados["id"] == produto_id].iloc[0]
+                            descricao = produto_label(produto)
+                            max_qtd = float(produto["quantidade"])
+                            preco_cadastrado = float(produto["valor_venda"] or 0)
+
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                quantidade = st.number_input(
+                                    "Quantidade",
+                                    min_value=1.0,
+                                    max_value=max_qtd,
+                                    value=1.0,
+                                    step=1.0,
+                                    key=f"cart_produto_quantidade_{produto_id}_{form_version}",
+                                )
+                            with col2:
+                                valor_padrao = "" if preco_cadastrado <= 0 else f"{preco_cadastrado:.2f}".replace(".", ",")
+                                valor_unitario_text = st.text_input(
+                                    "Valor da venda",
+                                    value=valor_padrao,
+                                    placeholder="Digite o valor",
+                                    key=f"cart_produto_valor_{produto_id}_{form_version}",
+                                )
+                                valor_unitario = _parse_money_input(valor_unitario_text)
+
+                            diferenca_preco = float(valor_unitario) - preco_cadastrado
+                            if abs(diferenca_preco) <= 0.01:
+                                st.caption("Preço normal do cadastro.")
+                            elif diferenca_preco > 0:
+                                st.info(f"Venda acima do preço cadastrado em {moeda(diferenca_preco)} por unidade.")
+                            else:
+                                st.warning(f"Desconto de {moeda(abs(diferenca_preco))} por unidade.")
+
+                            observacao_preco = st.text_input(
+                                "Motivo da alteração de preço",
+                                placeholder="Obrigatório se vender abaixo do preço cadastrado",
+                                key=f"cart_produto_motivo_preco_{produto_id}_{form_version}",
+                            )
+
+                            if st.button("Adicionar produto", width="stretch", disabled=st.session_state["produto_adicionando"]):
+                                if valor_unitario <= 0:
+                                    st.error("Informe o valor unitário do produto.")
+                                elif diferenca_preco < -0.01 and not observacao_preco.strip():
+                                    st.error("Informe o motivo do desconto.")
+                                elif _cart_has_same_product(produto_id):
+                                    st.warning("Este produto já está na lista de itens adicionados.")
+                                else:
+                                    st.session_state["produto_adicionando"] = True
+                                    _add_cart_item({
+                                        "tipo": "Produto",
+                                        "descricao": descricao,
+                                        "produto_id": int(produto_id),
+                                        "quantidade": float(quantidade),
+                                        "valor_unitario": float(valor_unitario),
+                                        "preco_original": preco_cadastrado,
+                                        "preco_vendido": float(valor_unitario),
+                                        "diferenca_preco": diferenca_preco,
+                                        "observacao_alteracao_preco": observacao_preco.strip(),
+                                    })
+                                    st.session_state["produto_adicionando"] = False
+                                    st.session_state["produto_adicionado_msg"] = True
+                                    st.session_state["novo_lancamento_form_version"] += 1
+                                    st.rerun()
 
     with tab_servico_cadastrado:
         if df_servicos.empty:
