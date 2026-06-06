@@ -69,6 +69,90 @@ def _pagamentos_do_dia(conn, data):
     """ + scope, conn, params=scoped_params(data))
 
 
+def _caixa_inicial_do_dia(conn, data):
+    where_caixa, params_caixa = scope_clause()
+    row = pd.read_sql_query(
+        f"""
+        SELECT COALESCE(SUM(valor_inicial), 0) AS valor
+        FROM caixa
+        {where_caixa + " AND" if where_caixa else " WHERE"} data = ?
+        """,
+        conn,
+        params=params_caixa + (data,),
+    )
+    return float(row.iloc[0]["valor"] or 0) if not row.empty else 0.0
+
+
+def _sangrias_do_dia(conn, data, limit=100):
+    scope, params = scope_clause("s", prefix="AND")
+    inicio = datetime.strptime(data, "%Y-%m-%d")
+    fim = inicio + timedelta(days=1)
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        date_params = (inicio, fim)
+    else:
+        date_params = (inicio.strftime("%Y-%m-%d"), fim.strftime("%Y-%m-%d"))
+
+    return pd.read_sql_query(
+        f"""
+        SELECT
+            s.data_hora,
+            s.usuario_nome,
+            s.retirado_por,
+            s.valor,
+            s.observacao,
+            q.nome AS quiosque_nome
+        FROM sangrias s
+        LEFT JOIN quiosques q ON q.id = s.quiosque_id
+        WHERE s.data_hora >= ? AND s.data_hora < ?
+        {scope}
+        ORDER BY s.data_hora DESC, s.id DESC
+        LIMIT ?
+        """,
+        conn,
+        params=date_params + params + (int(limit),),
+    )
+
+
+def _total_sangrias_do_dia(conn, data):
+    scope, params = scope_clause("s", prefix="AND")
+    inicio = datetime.strptime(data, "%Y-%m-%d")
+    fim = inicio + timedelta(days=1)
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        date_params = (inicio, fim)
+    else:
+        date_params = (inicio.strftime("%Y-%m-%d"), fim.strftime("%Y-%m-%d"))
+
+    row = pd.read_sql_query(
+        f"""
+        SELECT COALESCE(SUM(s.valor), 0) AS total
+        FROM sangrias s
+        WHERE s.data_hora >= ? AND s.data_hora < ?
+        {scope}
+        """,
+        conn,
+        params=date_params + params,
+    )
+    return float(row.iloc[0]["total"] or 0) if not row.empty else 0.0
+
+
+def _despesas_do_dia(conn, data):
+    if not has_permission("view_expenses"):
+        return pd.DataFrame(columns=["data", "valor", "descricao"])
+
+    where_despesas, params_despesas = scope_clause()
+    return pd.read_sql_query(
+        f"""
+        SELECT data, valor, descricao
+        FROM despesas
+        {where_despesas + " AND" if where_despesas else " WHERE"} data = ?
+        ORDER BY id DESC
+        LIMIT 100
+        """,
+        conn,
+        params=params_despesas + (data,),
+    )
+
+
 def _formatar_pagamentos_lancamento(grupo):
     pagamentos = (
         grupo.groupby("forma_pagamento")["valor"]
@@ -155,6 +239,184 @@ def _total_por_forma(df_pagamentos, forma, tipo=None):
         filtro = filtro & (df_pagamentos["tipo"] == tipo)
 
     return df_pagamentos[filtro]["valor"].sum()
+
+
+def _trend_label(valor_atual, valor_anterior):
+    atual = float(valor_atual or 0)
+    anterior = float(valor_anterior or 0)
+    if anterior <= 0:
+        return "↗ novo" if atual > 0 else "0%"
+
+    variacao = ((atual - anterior) / anterior) * 100
+    seta = "↗" if variacao >= 0 else "↘"
+    sinal = "+" if variacao >= 0 else ""
+    return f"{seta} {sinal}{variacao:.0f}%"
+
+
+def _toggle_detail(key):
+    st.session_state[key] = not st.session_state.get(key, False)
+
+
+def _render_finance_card(title, value, detail, accent, key):
+    metric_card(title, _moeda(value), detail, accent)
+    st.button(
+        "ℹ️ Detalhes" if not st.session_state.get(key, False) else "Fechar detalhes",
+        key=f"toggle_{key}",
+        width="stretch",
+        on_click=_toggle_detail,
+        args=(key,),
+    )
+
+
+def _render_money_details(conn, data_filtro, df_pagamentos, total_dinheiro):
+    caixa_inicial = _caixa_inicial_do_dia(conn, data_filtro)
+    df_sangrias = _sangrias_do_dia(conn, data_filtro, limit=100)
+    df_despesas = _despesas_do_dia(conn, data_filtro)
+    total_sangrias = df_sangrias["valor"].sum() if not df_sangrias.empty else 0
+    total_despesas = df_despesas["valor"].sum() if not df_despesas.empty else 0
+    saldo = caixa_inicial + float(total_dinheiro or 0) - total_sangrias - total_despesas
+    quantidade = len(df_pagamentos[df_pagamentos["forma_pagamento"] == "Dinheiro"])
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total em dinheiro", _moeda(total_dinheiro))
+    c2.metric("Caixa inicial", _moeda(caixa_inicial))
+    c3.metric("Saldo atual em caixa", _moeda(saldo))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Sangrias", _moeda(total_sangrias))
+    c2.metric("Despesas do dia", _moeda(total_despesas))
+    c3.metric("Vendas em dinheiro", quantidade)
+
+
+def _render_payment_details(df_pagamentos, forma, total_dia, total_geral):
+    df_forma = df_pagamentos[df_pagamentos["forma_pagamento"] == forma].copy()
+    quantidade = len(df_forma)
+    ticket = float(total_dia or 0) / quantidade if quantidade else 0
+    participacao = (float(total_dia or 0) / float(total_geral or 1)) * 100 if total_geral else 0
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric(f"Total {forma}", _moeda(total_dia))
+    c2.metric("Quantidade de vendas", quantidade)
+    c3.metric("Ticket médio", _moeda(ticket))
+    if forma in {"Crédito", "Débito"}:
+        st.caption(f"Participação no faturamento do dia: {participacao:.0f}%")
+    if forma == "Pix" and not df_forma.empty:
+        st.markdown("**Últimas 5 vendas Pix do dia**")
+        ultimas = df_forma.sort_values("id", ascending=False).head(5)[["descricao", "valor"]]
+        st.dataframe(
+            ultimas.rename(columns={"descricao": "Descrição", "valor": "Valor"}),
+            width="stretch",
+            hide_index=True,
+            column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
+        )
+
+
+def _render_sangria_details(conn, data_filtro):
+    df_sangrias = _sangrias_do_dia(conn, data_filtro, limit=200)
+    total_sangrias = df_sangrias["valor"].sum() if not df_sangrias.empty else 0
+    ultima = df_sangrias.iloc[0] if not df_sangrias.empty else None
+
+    c1, c2 = st.columns(2)
+    c1.metric("Total de sangrias do dia", _moeda(total_sangrias))
+    if ultima is not None:
+        hora = pd.to_datetime(ultima["data_hora"], errors="coerce")
+        hora_label = hora.strftime("%H:%M") if pd.notna(hora) else "-"
+        c2.metric("Última sangria", _moeda(ultima["valor"]), f"{hora_label} - {ultima['retirado_por'] or ultima['usuario_nome'] or '-'}")
+    else:
+        c2.metric("Última sangria", _moeda(0))
+
+    if df_sangrias.empty:
+        empty_state("Nenhuma sangria registrada no dia.")
+        return
+
+    tabela = df_sangrias.copy()
+    tabela["data_hora"] = pd.to_datetime(tabela["data_hora"], errors="coerce")
+    tabela["Data"] = tabela["data_hora"].dt.strftime("%d/%m/%Y")
+    tabela["Hora"] = tabela["data_hora"].dt.strftime("%H:%M")
+    tabela = tabela.rename(columns={
+        "usuario_nome": "Usuário",
+        "retirado_por": "Retirado por",
+        "quiosque_nome": "Quiosque",
+        "valor": "Valor retirado",
+        "observacao": "Observação",
+    })
+    st.dataframe(
+        tabela[["Data", "Hora", "Usuário", "Retirado por", "Quiosque", "Valor retirado", "Observação"]],
+        width="stretch",
+        hide_index=True,
+        column_config={"Valor retirado": st.column_config.NumberColumn("Valor retirado", format="R$ %.2f")},
+    )
+
+
+def _render_total_details(totals, meta):
+    bruto = totals["total"]
+    liquido = bruto - totals["sangrias"]
+    percentual_meta = (bruto / meta) * 100 if meta else 0
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Dinheiro", _moeda(totals["Dinheiro"]))
+    c2.metric("Pix", _moeda(totals["Pix"]))
+    c3.metric("Crédito", _moeda(totals["Crédito"]))
+    c4.metric("Débito", _moeda(totals["Débito"]))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Sangrias", _moeda(totals["sangrias"]))
+    c2.metric("Faturamento bruto", _moeda(bruto))
+    c3.metric("Faturamento líquido", _moeda(liquido), f"Meta: {percentual_meta:.0f}%")
+
+
+def _render_financial_summary(conn, data_filtro, df_pagamentos, df_pagamentos_anterior, total, meta):
+    totals = {
+        forma: _total_por_forma(df_pagamentos, forma)
+        for forma in FORMAS_PAGAMENTO
+    }
+    previous = {
+        forma: _total_por_forma(df_pagamentos_anterior, forma)
+        for forma in FORMAS_PAGAMENTO
+    }
+    df_sangrias_preview = _sangrias_do_dia(conn, data_filtro, limit=1)
+    total_sangrias_preview = _total_sangrias_do_dia(conn, data_filtro)
+    ultima_sangria = "Sem retirada hoje"
+    if not df_sangrias_preview.empty:
+        latest = df_sangrias_preview.iloc[0]
+        hora = pd.to_datetime(latest["data_hora"], errors="coerce")
+        hora_label = hora.strftime("%H:%M") if pd.notna(hora) else "-"
+        ultima_sangria = f"Última: {hora_label} - {latest['retirado_por'] or latest['usuario_nome'] or '-'}"
+
+    totals["sangrias"] = total_sangrias_preview
+    totals["total"] = total
+
+    st.subheader("Resumo financeiro")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        _render_finance_card("💵 Dinheiro", totals["Dinheiro"], _trend_label(totals["Dinheiro"], previous["Dinheiro"]), "#16A34A", "finance_dinheiro")
+    with c2:
+        _render_finance_card("📲 Pix", totals["Pix"], _trend_label(totals["Pix"], previous["Pix"]), "#18C29C", "finance_pix")
+    with c3:
+        _render_finance_card("💳 Crédito", totals["Crédito"], _trend_label(totals["Crédito"], previous["Crédito"]), "#5B8DEF", "finance_credito")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        _render_finance_card("💳 Débito", totals["Débito"], _trend_label(totals["Débito"], previous["Débito"]), "#F59E0B", "finance_debito")
+    with c2:
+        _render_finance_card("💸 Sangrias", totals["sangrias"], ultima_sangria, "#E63946", "finance_sangrias")
+    with c3:
+        _render_finance_card("🏆 Total Geral", total, f"Meta {(total / meta) * 100 if meta else 0:.0f}%", "#111827", "finance_total")
+
+    if st.session_state.get("finance_dinheiro"):
+        with st.expander("Detalhes de Dinheiro", expanded=True):
+            _render_money_details(conn, data_filtro, df_pagamentos, totals["Dinheiro"])
+    if st.session_state.get("finance_pix"):
+        with st.expander("Detalhes de Pix", expanded=True):
+            _render_payment_details(df_pagamentos, "Pix", totals["Pix"], total)
+    if st.session_state.get("finance_credito"):
+        with st.expander("Detalhes de Crédito", expanded=True):
+            _render_payment_details(df_pagamentos, "Crédito", totals["Crédito"], total)
+    if st.session_state.get("finance_debito"):
+        with st.expander("Detalhes de Débito", expanded=True):
+            _render_payment_details(df_pagamentos, "Débito", totals["Débito"], total)
+    if st.session_state.get("finance_sangrias"):
+        with st.expander("Histórico de Sangrias", expanded=True):
+            _render_sangria_details(conn, data_filtro)
+    if st.session_state.get("finance_total"):
+        with st.expander("Detalhes do Total Geral", expanded=True):
+            _render_total_details(totals, meta)
 
 
 def _render_pagamentos_por_tipo(df_pagamentos, tipo, titulo):
@@ -271,6 +533,7 @@ def render_dashboard_diario(conn):
     )
 
     df_pagamentos = _pagamentos_do_dia(conn, data_filtro)
+    df_pagamentos_anterior = _pagamentos_do_dia(conn, data_anterior)
     df_dia = df[df["data"] == data_filtro] if not df.empty else df
     df_anterior = df[df["data"] == data_anterior] if not df.empty else df
     df_despesas_dia = df_despesas[df_despesas["data"] == data_filtro] if not df_despesas.empty else df_despesas
@@ -301,6 +564,10 @@ def render_dashboard_diario(conn):
     st.divider()
 
     _render_meta_diaria(total, meta)
+
+    st.divider()
+
+    _render_financial_summary(conn, data_filtro, df_pagamentos, df_pagamentos_anterior, total, meta)
 
     st.divider()
 
