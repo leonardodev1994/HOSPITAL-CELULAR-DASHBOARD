@@ -7,10 +7,9 @@ import streamlit as st
 from utils.dashboard_ui import (
     PLOTLY_CONFIG,
     empty_state,
+    light_page_header,
     metric_card,
     moeda,
-    page_banner,
-    page_header,
     pie_chart,
 )
 from utils.permissions import has_permission
@@ -757,11 +756,7 @@ def render_dashboard_diario(conn):
     data_filtro = selected_date.strftime("%Y-%m-%d")
     data_anterior = (selected_date - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    page_banner("tx_dashboard_diario_banner.webp", "TX System - Dashboard Diário")
-    page_header(
-        "Dashboard Diário",
-        f"Análise operacional de {selected_date.strftime('%d/%m/%Y')}",
-    )
+    light_page_header("📈", "Dashboard Diário", f"Análise operacional de {selected_date.strftime('%d/%m/%Y')}.")
 
     df_pagamentos = _pagamentos_do_dia(conn, data_filtro)
     df_pagamentos_anterior = _pagamentos_do_dia(conn, data_anterior)

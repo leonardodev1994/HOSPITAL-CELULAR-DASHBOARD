@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.auth import current_user, hash_password
-from utils.dashboard_ui import page_banner
+from utils.dashboard_ui import light_page_header
 from utils.permissions import PERFIS
 from utils.quiosques import load_quiosques
 
@@ -89,8 +89,7 @@ def render_usuarios(conn):
         st.warning("Apenas administradores podem acessar usuários e funcionários.")
         return
 
-    page_banner("tx_usuarios_banner.webp", "TX System - Usuários e Funcionários")
-    st.subheader("👥 Usuários e Funcionários")
+    light_page_header("👥", "Usuários e Funcionários", "Gerencie acessos, perfis e quiosques com segurança.")
     df_quiosques = load_quiosques(conn)
     quiosque_options = {int(row.id): row.nome for row in df_quiosques.itertuples()}
 

@@ -2,7 +2,7 @@ import streamlit as st
 
 from utils.audit import log_action
 from utils.auth import current_user
-from utils.dashboard_ui import moeda, page_banner, page_header
+from utils.dashboard_ui import light_page_header, moeda
 from utils.permissions import has_permission
 from utils.servicos import create_service, deactivate_service, load_services, servico_label, update_service
 
@@ -15,8 +15,7 @@ def render_servicos(conn):
     st.session_state.setdefault("servico_editando_id", None)
     st.session_state.setdefault("servico_excluir_id", None)
 
-    page_banner("tx_lancamento_banner.webp", "TX System - Serviços")
-    page_header("Serviços", "Tabela de serviços cadastrados para vendas e ordens de serviço.")
+    light_page_header("🧰", "Serviços", "Tabela de serviços para vendas e ordens de serviço.")
 
     if can_manage:
         if not st.session_state["servico_form_aberto"]:

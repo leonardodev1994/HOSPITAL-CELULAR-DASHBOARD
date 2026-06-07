@@ -6,7 +6,7 @@ import streamlit as st
 from database.database import execute_insert_returning_id
 from utils.audit import log_action
 from utils.auth import current_user
-from utils.dashboard_ui import moeda, page_banner
+from utils.dashboard_ui import light_page_header, moeda
 from utils.estoque import load_stock, produto_label, reduce_stock, restore_stock
 from utils.quiosques import current_quiosque_id, load_quiosques, scope_clause, user_can_view_all
 from utils.sales_authorization import can_directly_change_sale, validate_sale_authorization
@@ -714,8 +714,7 @@ def render_novo_lancamento(conn):
     st.session_state.setdefault("novo_lancamento_form_version", 0)
     form_version = st.session_state["novo_lancamento_form_version"]
 
-    page_banner("tx_lancamento_banner.webp", "TX System - Novo Lançamento")
-    st.subheader("➕ Novo Lançamento")
+    light_page_header("➕", "Novo Lançamento", "Registre vendas e serviços com fluxo rápido e limpo.")
 
     catalog_prefill = st.session_state.pop("catalogo_venda_prefill", None)
     if catalog_prefill:

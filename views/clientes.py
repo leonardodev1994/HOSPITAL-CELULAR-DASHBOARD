@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from database.database import execute_insert_returning_id
-from utils.dashboard_ui import page_banner
+from utils.dashboard_ui import light_page_header
 from utils.quiosques import current_quiosque_id, scope_clause
 from utils.text import search_matches
 
@@ -154,8 +154,7 @@ def _render_cliente_details(row):
 
 
 def render_clientes(conn):
-    page_banner("tx_clientes_banner.webp", "TX System - Clientes")
-    st.subheader("👤 Clientes")
+    light_page_header("👤", "Clientes", "Cadastro e busca rápida para atendimento no balcão.")
 
     st.session_state.setdefault("cliente_form_aberto", False)
     st.session_state.setdefault("cliente_salvando", False)

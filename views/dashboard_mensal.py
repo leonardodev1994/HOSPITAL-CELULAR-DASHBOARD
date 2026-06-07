@@ -4,7 +4,7 @@ from datetime import timedelta
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import PLOTLY_CONFIG, bar_chart, empty_state, metric_card, moeda, page_banner, page_header, pie_chart
+from utils.dashboard_ui import PLOTLY_CONFIG, bar_chart, empty_state, light_page_header, metric_card, moeda, pie_chart
 from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause
 
@@ -90,11 +90,7 @@ def render_dashboard_mensal(conn):
             max_value=max_date,
         )
 
-    page_banner("tx_dashboard_mensal_banner.webp", "TX System - Dashboard Mensal")
-    page_header(
-        "Dashboard Mensal",
-        f"Visão financeira e comercial: {_period_label(start_date, end_date)}",
-    )
+    light_page_header("📅", "Dashboard Mensal", f"Visão financeira e comercial: {_period_label(start_date, end_date)}.")
 
     if df.empty:
         empty_state("Nenhum lançamento cadastrado ainda.")

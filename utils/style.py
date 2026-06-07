@@ -2374,6 +2374,64 @@ def apply_style():
         margin: 0 0 4px;
     }
 
+    .tx-light-header {
+        align-items: center;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, .98), rgba(248, 250, 252, .96)),
+            radial-gradient(circle at 100% 0%, rgba(22, 163, 74, .08), transparent 36%);
+        border: 1px solid #E5E7EB;
+        border-left: 5px solid var(--accent-2);
+        border-radius: 16px;
+        box-shadow: var(--shadow-soft);
+        display: flex;
+        gap: 14px;
+        margin: 0 0 1rem;
+        padding: 18px 20px;
+    }
+
+    .tx-light-header-icon {
+        align-items: center;
+        background: #111827;
+        border: 1px solid rgba(22, 163, 74, .32);
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(17, 24, 39, .12);
+        color: #FFFFFF !important;
+        display: flex;
+        flex: 0 0 52px;
+        font-size: 1.55rem;
+        height: 52px;
+        justify-content: center;
+        line-height: 1;
+        width: 52px;
+    }
+
+    .tx-light-header span {
+        color: var(--accent-2) !important;
+        display: block;
+        font-size: .72rem;
+        font-weight: 900;
+        letter-spacing: .08em;
+        margin-bottom: 3px;
+        text-transform: uppercase;
+    }
+
+    .tx-light-header h1 {
+        color: var(--text) !important;
+        font-size: clamp(1.35rem, 3vw, 1.9rem);
+        font-weight: 950;
+        letter-spacing: 0;
+        line-height: 1.08;
+        margin: 0 0 4px;
+    }
+
+    .tx-light-header p {
+        color: var(--muted) !important;
+        font-size: .96rem;
+        font-weight: 650;
+        line-height: 1.35;
+        margin: 0;
+    }
+
     .daily-goal-head {
         display: flex;
         align-items: center;
@@ -2804,6 +2862,21 @@ def apply_style():
         .daily-goal-card {
             padding: 18px;
             border-radius: 14px;
+        }
+
+        .tx-light-header {
+            align-items: flex-start;
+            border-radius: 14px;
+            gap: 12px;
+            padding: 15px;
+        }
+
+        .tx-light-header-icon {
+            border-radius: 12px;
+            flex-basis: 46px;
+            font-size: 1.32rem;
+            height: 46px;
+            width: 46px;
         }
 
         .daily-goal-head {

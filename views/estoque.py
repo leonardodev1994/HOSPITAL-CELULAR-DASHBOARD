@@ -3,7 +3,7 @@ import streamlit as st
 
 from utils.audit import log_action
 from utils.auth import current_user
-from utils.dashboard_ui import metric_card, moeda, page_banner, page_header
+from utils.dashboard_ui import light_page_header, metric_card, moeda
 from utils.permissions import has_permission
 from utils.estoque import (
     add_stock_product,
@@ -157,11 +157,7 @@ def render_estoque(conn):
     st.session_state.setdefault("estoque_editando_id", None)
     st.session_state.setdefault("estoque_excluir_id", None)
 
-    page_banner("tx_estoque_banner.webp", "TX System - Estoque")
-    page_header(
-        "Estoque",
-        "Controle de produtos, importação da planilha e alerta de estoque baixo.",
-    )
+    light_page_header("📦", "Estoque", "Controle seus produtos com rapidez e precisão.")
 
     df = load_stock(conn)
     total_produtos = len(df)

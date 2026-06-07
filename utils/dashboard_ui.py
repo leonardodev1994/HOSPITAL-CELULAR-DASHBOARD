@@ -1,4 +1,5 @@
 import base64
+from html import escape
 from pathlib import Path
 
 import plotly.express as px
@@ -75,6 +76,22 @@ def page_header(title, subtitle):
                 <span class="dash-hero-kicker">Tecnologia urbana para gestão inteligente</span>
                 <h1>{title}</h1>
                 <p>{subtitle}</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def light_page_header(icon, title, subtitle):
+    st.markdown(
+        f"""
+        <div class="tx-light-header">
+            <div class="tx-light-header-icon">{escape(str(icon or "TX"))}</div>
+            <div>
+                <span>TX System</span>
+                <h1>{escape(str(title or ""))}</h1>
+                <p>{escape(str(subtitle or ""))}</p>
             </div>
         </div>
         """,

@@ -5,7 +5,7 @@ import streamlit as st
 
 from utils.audit import log_action
 from utils.auth import current_user
-from utils.dashboard_ui import moeda, page_banner
+from utils.dashboard_ui import light_page_header, moeda
 from utils.permissions import has_permission, require_permission
 from utils.quiosques import current_quiosque_id, load_quiosques, scope_clause, user_can_view_all
 
@@ -90,8 +90,7 @@ def render_despesas(conn):
     st.session_state.setdefault("despesa_editando_id", None)
     st.session_state.setdefault("despesa_excluir_id", None)
 
-    page_banner("tx_despesas_banner.webp", "TX System - Despesas")
-    st.subheader("💸 Nova Despesa")
+    light_page_header("💸", "Despesas", "Registre e acompanhe custos da operação.")
 
     if not st.session_state["despesa_form_aberto"]:
         if st.button("➕ Cadastrar despesa", width="stretch"):

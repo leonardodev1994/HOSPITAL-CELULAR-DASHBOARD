@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import moeda, page_banner, page_header
+from utils.dashboard_ui import light_page_header, moeda
 from utils.permissions import require_permission
 from utils.quiosques import scope_clause
 
@@ -66,11 +66,7 @@ def render_lancamentos_cancelados(conn):
     if not require_permission("view_canceled_sales"):
         return
 
-    page_banner("tx_lancamento_banner.webp", "TX System - Lançamentos Cancelados")
-    page_header(
-        "Lançamentos Cancelados",
-        "Auditoria de vendas canceladas, autorização e motivo informado.",
-    )
+    light_page_header("🚫", "Lançamentos Cancelados", "Auditoria de cancelamentos, autorizações e motivos informados.")
 
     hoje = date.today()
     col1, col2 = st.columns(2)

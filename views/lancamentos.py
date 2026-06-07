@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.auth import current_user
-from utils.dashboard_ui import moeda, page_banner, page_header
+from utils.dashboard_ui import light_page_header, moeda
 from views.novo_lancamento import (
     _load_lancamentos,
     _render_lancamento_action_dialog,
@@ -57,11 +57,7 @@ def render_lancamentos(conn):
     user = current_user()
     st.session_state.setdefault("lancamento_aberto", None)
 
-    page_banner("tx_lancamento_banner.webp", "TX System - Lançamentos")
-    page_header(
-        "Lançamentos",
-        "Consulte, edite ou cancele vendas já registradas sem pesar a tela inicial.",
-    )
+    light_page_header("📋", "Lançamentos", "Consulte, edite ou cancele vendas sem pesar a tela inicial.")
 
     hoje = date.today()
     col1, col2, col3 = st.columns([1, 1, 0.7])

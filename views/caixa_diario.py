@@ -5,7 +5,7 @@ import streamlit as st
 
 from utils.audit import log_action
 from utils.auth import current_user
-from utils.dashboard_ui import PLOTLY_CONFIG, page_banner, pie_chart
+from utils.dashboard_ui import PLOTLY_CONFIG, light_page_header, pie_chart
 from utils.permissions import has_permission
 from utils.quiosques import current_quiosque_id, scope_clause, scoped_params
 
@@ -90,8 +90,7 @@ def render_caixa_diario(conn):
     hoje = datetime.today().strftime("%Y-%m-%d")
     can_register_sangria = has_permission("register_cash_withdrawal", user)
 
-    page_banner("tx_caixa_banner.webp", "TX System - Caixa Diário")
-    st.subheader("💰 Caixa Diário")
+    light_page_header("💰", "Caixa Diário", "Acompanhe entradas, retiradas e fechamento do caixa.")
 
     valor_inicial = st.number_input("Valor Inicial", min_value=0.0)
 

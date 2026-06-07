@@ -5,7 +5,7 @@ from io import BytesIO
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import page_header
+from utils.dashboard_ui import light_page_header
 from utils.permissions import require_permission
 from utils.quiosques import load_quiosques
 
@@ -210,10 +210,7 @@ def render_auditoria(conn):
     if not require_permission("view_audit"):
         return
 
-    page_header(
-        "Auditoria",
-        "Controle de alterações, importações, cancelamentos e ações importantes do sistema.",
-    )
+    light_page_header("🧾", "Auditoria", "Controle alterações, importações, cancelamentos e ações importantes.")
 
     usuarios, acoes, modulos = _load_filter_options(conn)
     quiosques = load_quiosques(conn)

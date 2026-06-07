@@ -12,7 +12,7 @@ from utils.catalogo import (
     load_catalog_items,
     preview_catalog_import,
 )
-from utils.dashboard_ui import metric_card, moeda, page_banner, page_header
+from utils.dashboard_ui import light_page_header, metric_card, moeda
 from utils.permissions import has_permission
 from utils.text import search_matches
 
@@ -306,8 +306,7 @@ def render_catalogo(conn):
     user = current_user()
     can_manage = has_permission("manage_stock", user)
 
-    page_banner("tx_estoque_banner.webp", "TX System - Catálogo")
-    page_header("Catálogo Inteligente", "Busca rápida de telas e peças com preço sugerido automático.")
+    light_page_header("🔎", "Catálogo Inteligente", "Pesquise telas e peças com preço sugerido em segundos.")
 
     orcamento = st.session_state.get("catalogo_orcamento")
     if orcamento:
