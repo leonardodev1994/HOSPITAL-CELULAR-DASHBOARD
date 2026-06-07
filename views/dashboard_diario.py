@@ -5,7 +5,6 @@ import streamlit as st
 
 from utils.dashboard_ui import (
     PLOTLY_CONFIG,
-    bar_chart,
     empty_state,
     metric_card,
     moeda,
@@ -14,7 +13,7 @@ from utils.dashboard_ui import (
     pie_chart,
 )
 from utils.permissions import has_permission
-from utils.quiosques import scope_clause, scoped_params
+from utils.quiosques import scope_clause, scoped_params, user_can_view_all
 
 
 FORMAS_PAGAMENTO = ["Dinheiro", "Pix", "Crédito", "Débito"]
@@ -45,6 +44,49 @@ def _render_meta_diaria(total, meta=1000):
             <div class="daily-goal-value">{_moeda(total)} <small>/ {_moeda(meta)}</small></div>
             <p>{status}</p>
             <div class="daily-goal-track"><i></i></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_mix_servicos_produtos(servicos, produtos):
+    total = float(servicos or 0) + float(produtos or 0)
+    if total <= 0:
+        empty_state("Sem serviços ou produtos no período selecionado.")
+        return
+
+    rows = [("Serviços", float(servicos or 0), "#18C29C"), ("Produtos", float(produtos or 0), "#F59E0B")]
+    active = [row for row in rows if row[1] > 0]
+    if len(active) == 1:
+        st.markdown(
+            f"""
+            <div class="tx-mix-card">
+                <strong>Serviços x Produtos</strong>
+                <p>Serviços: {_moeda(servicos)}</p>
+                <p>Produtos: {_moeda(produtos)}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    bars = []
+    for label, value, color in rows:
+        percent = (value / total) * 100 if total else 0
+        bars.append(
+            f"""
+            <div class="tx-mix-row">
+                <div><strong>{label}</strong><span>{_moeda(value)} · {percent:.0f}%</span></div>
+                <div class="tx-mix-track"><i style="width:{percent:.2f}%; background:{color};"></i></div>
+            </div>
+            """
+        )
+    st.markdown(
+        f"""
+        <div class="tx-mix-card">
+            <strong>Serviços x Produtos</strong>
+            {''.join(bars)}
         </div>
         """,
         unsafe_allow_html=True,
@@ -266,6 +308,194 @@ def _render_finance_card(title, value, detail, accent, key):
         on_click=_toggle_detail,
         args=(key,),
     )
+
+
+def _render_clickable_metric(title, value, detail, accent, key):
+    metric_card(title, value, detail, accent)
+    st.button(
+        "ℹ️ Detalhes" if not st.session_state.get(key, False) else "Fechar detalhes",
+        key=f"toggle_{key}",
+        width="stretch",
+        on_click=_toggle_detail,
+        args=(key,),
+    )
+
+
+def _render_sales_card_details(df_dia, tipo=None):
+    data = df_dia.copy()
+    if tipo:
+        data = data[data["tipo"] == tipo]
+    quantidade = len(data)
+    total = data["valor"].sum() if not data.empty else 0
+    ticket = total / quantidade if quantidade else 0
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Quantidade", quantidade)
+    c2.metric("Total", _moeda(total))
+    c3.metric("Ticket médio", _moeda(ticket))
+    if data.empty:
+        empty_state("Nenhum lançamento para detalhar.")
+        return
+    if tipo:
+        ranking = (
+            data.groupby("descricao", as_index=False)
+            .agg(valor=("valor", "sum"), quantidade=("id", "count"))
+            .sort_values("valor", ascending=False)
+            .head(5)
+        )
+        st.dataframe(
+            ranking.rename(columns={"descricao": "Descrição", "valor": "Valor", "quantidade": "Qtd"}),
+            width="stretch",
+            hide_index=True,
+            column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
+        )
+    else:
+        ultimos = data.sort_values("id", ascending=False).head(5)[["data", "tipo", "descricao", "valor"]]
+        st.dataframe(
+            ultimos.rename(columns={"data": "Data", "tipo": "Tipo", "descricao": "Descrição", "valor": "Valor"}),
+            width="stretch",
+            hide_index=True,
+            column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
+        )
+
+
+def _load_manager_alerts(conn, data_filtro, total, meta):
+    alerts = []
+    scope_l, params_l = scope_clause("l", prefix="AND")
+    pendencias = pd.read_sql_query(
+        """
+        SELECT COUNT(*) AS total
+        FROM lancamentos l
+        WHERE COALESCE(l.status, 'Ativo') NOT IN ('Ativo', 'Cancelado')
+        """ + scope_l,
+        conn,
+        params=params_l,
+    )
+    pending_count = int(pendencias.iloc[0]["total"] or 0) if not pendencias.empty else 0
+    if pending_count:
+        alerts.append(f"⚠️ {pending_count} pendência(s) em aberto")
+
+    scope_e, params_e = scope_clause("e", prefix="AND")
+    low_stock = pd.read_sql_query(
+        """
+        SELECT e.produto, e.modelo, e.quantidade, e.estoque_minimo
+        FROM estoque e
+        WHERE COALESCE(e.ativo, 1) = 1
+          AND COALESCE(e.quantidade, 0) <= COALESCE(e.estoque_minimo, 0)
+        """ + scope_e + """
+        ORDER BY e.quantidade ASC, e.produto
+        LIMIT 3
+        """,
+        conn,
+        params=params_e,
+    )
+    if not low_stock.empty:
+        first = low_stock.iloc[0]
+        label = f"{first['produto'] or ''} {first['modelo'] or ''}".strip()
+        alerts.append(f"⚠️ Estoque baixo: {label}")
+
+    total_sangrias = _total_sangrias_do_dia(conn, data_filtro)
+    if total_sangrias > 500:
+        alerts.append(f"⚠️ Sangria acima de R$ 500 hoje: {_moeda(total_sangrias)}")
+
+    percent_meta = (float(total or 0) / float(meta or 1)) * 100
+    if percent_meta < 50:
+        alerts.append(f"⚠️ Meta diária abaixo de 50% ({percent_meta:.0f}%)")
+
+    scope_os, params_os = scope_clause("os", prefix="AND")
+    os_paradas = pd.read_sql_query(
+        """
+        SELECT COUNT(*) AS total
+        FROM ordens_servico os
+        WHERE COALESCE(os.status, '') IN ('Em análise', 'Em reparo', 'Aguardando peça')
+        """ + scope_os,
+        conn,
+        params=params_os,
+    )
+    os_count = int(os_paradas.iloc[0]["total"] or 0) if not os_paradas.empty else 0
+    if os_count:
+        alerts.append(f"⚠️ {os_count} OS parada(s) ou em andamento")
+
+    return alerts
+
+
+def _render_manager_attention(conn, data_filtro, total, meta):
+    alerts = _load_manager_alerts(conn, data_filtro, total, meta)
+    if not alerts:
+        alerts = ["Tudo certo no momento. Nenhum alerta crítico encontrado."]
+    html = "".join(f"<li>{alert}</li>" for alert in alerts[:6])
+    st.markdown(
+        f"""
+        <div class="manager-alert-card">
+            <div>
+                <span>🚨 Atenção do Gestor</span>
+                <strong>Pontos que merecem ação rápida</strong>
+            </div>
+            <ul>{html}</ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _ranking_period_bounds(mode, selected_date, start=None, end=None):
+    if mode == "Hoje":
+        return selected_date.strftime("%Y-%m-%d"), selected_date.strftime("%Y-%m-%d")
+    if mode == "Mês":
+        month_start = selected_date.replace(day=1)
+        return month_start.strftime("%Y-%m-%d"), selected_date.strftime("%Y-%m-%d")
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
+def _load_quiosque_ranking(conn, start_date, end_date):
+    return pd.read_sql_query(
+        """
+        SELECT
+            q.nome AS quiosque,
+            COALESCE(SUM(l.valor), 0) AS faturamento
+        FROM quiosques q
+        LEFT JOIN lancamentos l
+          ON l.quiosque_id = q.id
+         AND l.data >= ?
+         AND l.data <= ?
+         AND COALESCE(l.status, 'Ativo') <> 'Cancelado'
+        WHERE COALESCE(q.ativo, 1) = 1
+        GROUP BY q.id, q.nome
+        ORDER BY faturamento DESC, q.id
+        LIMIT 4
+        """,
+        conn,
+        params=(start_date, end_date),
+    )
+
+
+def _render_quiosque_ranking(conn, selected_date):
+    if not user_can_view_all():
+        return
+    st.subheader("Ranking dos Quiosques")
+    mode = st.segmented_control("Período do ranking", ["Hoje", "Mês", "Período personalizado"], default="Hoje")
+    start_date = selected_date
+    end_date = selected_date
+    if mode == "Período personalizado":
+        c1, c2 = st.columns(2)
+        with c1:
+            start_date = st.date_input("Início do ranking", value=selected_date.replace(day=1), key="ranking_inicio")
+        with c2:
+            end_date = st.date_input("Fim do ranking", value=selected_date, key="ranking_fim")
+    start, end = _ranking_period_bounds(mode, selected_date, start_date, end_date)
+    ranking = _load_quiosque_ranking(conn, start, end)
+    medals = ["🥇", "🥈", "🥉", "4️⃣"]
+    items = []
+    for index, row in enumerate(ranking.itertuples()):
+        items.append(
+            f"""
+            <div class="ranking-row">
+                <span>{medals[index]}</span>
+                <strong>{row.quiosque}</strong>
+                <em>{_moeda(row.faturamento)}</em>
+            </div>
+            """
+        )
+    st.markdown(f"<div class='ranking-card'>{''.join(items)}</div>", unsafe_allow_html=True)
 
 
 def _render_money_details(conn, data_filtro, df_pagamentos, total_dinheiro):
@@ -549,17 +779,31 @@ def render_dashboard_diario(conn):
 
     meta = 1000
 
+    _render_manager_attention(conn, data_filtro, total, meta)
+
+    st.divider()
+
     cols = st.columns(4 if has_permission("view_profit") else 3)
     c1, c2, c3 = cols[:3]
     with c1:
-        metric_card("Faturamento", _moeda(total), diferenca_label, "#5B8DEF")
+        _render_clickable_metric("💰 Faturamento", _moeda(total), diferenca_label, "#5B8DEF", "daily_detail_faturamento")
     with c2:
-        metric_card("Serviços", _moeda(servicos), f"{len(df_dia[df_dia['tipo'] == 'Serviço']) if not df_dia.empty else 0} lançamentos", "#18C29C")
+        _render_clickable_metric("🔧 Serviços", _moeda(servicos), f"{len(df_dia[df_dia['tipo'] == 'Serviço']) if not df_dia.empty else 0} lançamentos", "#18C29C", "daily_detail_servicos")
     with c3:
-        metric_card("Produtos", _moeda(produtos), f"{len(df_dia[df_dia['tipo'] == 'Produto']) if not df_dia.empty else 0} vendas", "#F59E0B")
+        _render_clickable_metric("📦 Produtos", _moeda(produtos), f"{len(df_dia[df_dia['tipo'] == 'Produto']) if not df_dia.empty else 0} vendas", "#F59E0B", "daily_detail_produtos")
     if has_permission("view_profit"):
         with cols[3]:
             metric_card("Lucro estimado", _moeda(lucro), f"Despesas: {_moeda(despesas)}", "#EF4444")
+
+    if st.session_state.get("daily_detail_faturamento"):
+        with st.expander("Detalhes do Faturamento", expanded=True):
+            _render_sales_card_details(df_dia)
+    if st.session_state.get("daily_detail_servicos"):
+        with st.expander("Detalhes dos Serviços", expanded=True):
+            _render_sales_card_details(df_dia, "Serviço")
+    if st.session_state.get("daily_detail_produtos"):
+        with st.expander("Detalhes dos Produtos", expanded=True):
+            _render_sales_card_details(df_dia, "Produto")
 
     st.divider()
 
@@ -570,6 +814,11 @@ def render_dashboard_diario(conn):
     _render_financial_summary(conn, data_filtro, df_pagamentos, df_pagamentos_anterior, total, meta)
 
     st.divider()
+
+    _render_quiosque_ranking(conn, selected_date)
+
+    if user_can_view_all():
+        st.divider()
 
     col1, col2 = st.columns(2)
     with col1:
@@ -583,14 +832,16 @@ def render_dashboard_diario(conn):
                 config=PLOTLY_CONFIG,
             )
     with col2:
-        top_itens = _resumo_top_itens(df_dia)
-        if top_itens.empty:
-            empty_state("Sem itens para ranking nesse dia.")
-        else:
-            st.plotly_chart(
-                bar_chart(top_itens, "valor", "descricao", "Itens com maior faturamento"),
+        _render_mix_servicos_produtos(servicos, produtos)
+
+    top_itens = _resumo_top_itens(df_dia)
+    if not top_itens.empty:
+        with st.expander("Itens com maior faturamento", expanded=False):
+            st.dataframe(
+                top_itens.rename(columns={"descricao": "Descrição", "valor": "Valor", "quantidade": "Qtd"}),
                 width="stretch",
-                config=PLOTLY_CONFIG,
+                hide_index=True,
+                column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
             )
 
     _render_pagamentos_por_tipo(

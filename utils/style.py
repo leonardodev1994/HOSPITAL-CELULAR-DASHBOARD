@@ -2435,6 +2435,255 @@ def apply_style():
         box-shadow: 0 0 18px rgba(22, 163, 74, .18);
     }
 
+    .tx-mix-card,
+    .manager-alert-card,
+    .ranking-card,
+    .company-status-card,
+    .os-status-grid,
+    .sangria-summary-card {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 16px;
+        box-shadow: var(--shadow-soft);
+        padding: 18px;
+        width: 100%;
+    }
+
+    .tx-mix-card > strong,
+    .manager-alert-card span,
+    .os-status-grid > strong,
+    .sangria-summary-card span {
+        color: var(--text) !important;
+        display: block;
+        font-size: 1rem;
+        font-weight: 900;
+        margin-bottom: 10px;
+    }
+
+    .tx-mix-card p {
+        color: var(--text) !important;
+        font-size: 1.05rem;
+        font-weight: 800;
+        margin: 8px 0;
+    }
+
+    .tx-mix-row {
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .tx-mix-row div:first-child {
+        align-items: center;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .tx-mix-row strong {
+        color: var(--text) !important;
+        font-weight: 900;
+    }
+
+    .tx-mix-row span {
+        color: var(--muted) !important;
+        font-size: .9rem;
+        font-weight: 800;
+    }
+
+    .tx-mix-track {
+        background: #EEF2F7;
+        border: 1px solid #E5E7EB;
+        border-radius: 999px;
+        height: 13px;
+        overflow: hidden;
+    }
+
+    .tx-mix-track i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+    }
+
+    .manager-alert-card {
+        border-left: 5px solid #E63946;
+    }
+
+    .company-status-card {
+        align-items: stretch;
+        border-left: 6px solid var(--status-accent, var(--accent-2));
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(240px, .8fr) 1.2fr;
+        margin-bottom: 14px;
+    }
+
+    .company-status-card span {
+        color: var(--muted) !important;
+        display: block;
+        font-size: .82rem;
+        font-weight: 900;
+        letter-spacing: .04em;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+    }
+
+    .company-status-card strong {
+        color: var(--text) !important;
+        display: block;
+        font-size: clamp(1.55rem, 4vw, 2.25rem);
+        font-weight: 950;
+        letter-spacing: 0;
+        line-height: 1.05;
+        margin-bottom: 8px;
+    }
+
+    .company-status-card p,
+    .sangria-summary-card p,
+    .sangria-summary-card small {
+        color: var(--muted) !important;
+        margin: 0;
+    }
+
+    .manager-alert-card strong {
+        color: var(--muted) !important;
+        display: block;
+        font-size: .9rem;
+        margin-bottom: 12px;
+    }
+
+    .manager-alert-card ul,
+    .company-status-card ul {
+        display: grid;
+        gap: 8px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .manager-alert-card li,
+    .company-status-card li {
+        background: #F8FAFC;
+        border: 1px solid #E5E7EB;
+        border-radius: 10px;
+        color: var(--text) !important;
+        font-weight: 700;
+        padding: 10px 12px;
+    }
+
+    .ranking-card {
+        display: grid;
+        gap: 10px;
+    }
+
+    .ranking-row {
+        align-items: center;
+        background: #F8FAFC;
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: auto 1fr auto;
+        padding: 12px 14px;
+    }
+
+    .ranking-row strong {
+        color: var(--text) !important;
+        font-weight: 900;
+    }
+
+    .ranking-row em {
+        color: var(--accent-2) !important;
+        font-style: normal;
+        font-weight: 900;
+    }
+
+    .ranking-row span {
+        color: var(--muted) !important;
+        display: block;
+        font-size: .82rem;
+        font-weight: 750;
+        margin-top: 2px;
+    }
+
+    .payment-value-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-top: 12px;
+    }
+
+    .payment-value-grid div {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-top: 3px solid var(--pay-accent, var(--accent-2));
+        border-radius: 12px;
+        box-shadow: 0 10px 28px rgba(17, 24, 39, .06);
+        padding: 12px;
+    }
+
+    .payment-value-grid span {
+        color: var(--muted) !important;
+        display: block;
+        font-size: .78rem;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .payment-value-grid strong {
+        color: var(--text) !important;
+        display: block;
+        font-size: 1.05rem;
+        font-weight: 950;
+        margin-top: 4px;
+    }
+
+    .os-status-grid {
+        display: grid;
+        gap: 10px;
+    }
+
+    .os-status-grid div {
+        align-items: center;
+        background: #F8FAFC;
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 14px;
+    }
+
+    .os-status-grid span {
+        color: var(--muted) !important;
+        font-weight: 850;
+    }
+
+    .os-status-grid b {
+        color: var(--accent-2) !important;
+        font-size: 1.15rem;
+        font-weight: 950;
+    }
+
+    .sangria-summary-card {
+        border-left: 5px solid #F59E0B;
+        min-height: 100%;
+    }
+
+    .sangria-summary-card strong {
+        color: var(--text) !important;
+        display: block;
+        font-size: clamp(1.55rem, 4vw, 2.2rem);
+        font-weight: 950;
+        line-height: 1;
+        margin: 8px 0;
+    }
+
+    .sangria-summary-card small {
+        display: block;
+        font-weight: 800;
+        margin-top: 12px;
+    }
+
     .section-panel {
         border-left: 4px solid var(--accent-2) !important;
     }
@@ -2561,6 +2810,37 @@ def apply_style():
             align-items: flex-start;
             flex-direction: column;
             gap: 6px;
+        }
+
+        .tx-mix-card,
+        .manager-alert-card,
+        .ranking-card,
+        .company-status-card,
+        .os-status-grid,
+        .sangria-summary-card {
+            border-radius: 14px;
+            padding: 15px;
+        }
+
+        .company-status-card {
+            grid-template-columns: 1fr;
+        }
+
+        .payment-value-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .tx-mix-row div:first-child,
+        .ranking-row {
+            align-items: flex-start;
+        }
+
+        .ranking-row {
+            grid-template-columns: auto 1fr;
+        }
+
+        .ranking-row em {
+            grid-column: 2;
         }
     }
     </style>
