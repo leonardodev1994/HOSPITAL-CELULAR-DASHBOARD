@@ -8,6 +8,7 @@ import streamlit as st
 from utils.dashboard_ui import PLOTLY_CONFIG, empty_state, moeda, page_banner, page_header, pie_chart
 from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause, user_can_view_all
+from utils.tx_components import tx_card
 
 
 META_DIARIA_PADRAO = 1000.0
@@ -481,28 +482,6 @@ def _render_goal_card(meta, faturado):
     )
 
 
-def _set_open_card(card_id):
-    current = st.session_state.get("dash_geral_open_card")
-    st.session_state["dash_geral_open_card"] = None if current == card_id else card_id
-
-
-def _render_clickable_card(label, value, detail, accent, card_id):
-    is_open = st.session_state.get("dash_geral_open_card") == card_id
-    arrow = "▲" if is_open else "▼"
-    st.markdown(
-        f"<span class='tx-click-card-marker tx-card-{card_id}'></span>",
-        unsafe_allow_html=True,
-    )
-    st.button(
-        f"{label}  {arrow}\n{value}\n{detail}",
-        key=f"dash_geral_card_{card_id}",
-        on_click=_set_open_card,
-        args=(card_id,),
-        width="stretch",
-    )
-    return is_open
-
-
 def _render_metric_detail(conn, inicio, fim, title, tipo=None):
     atual_valor, atual_qtd = _total_lancamentos(conn, inicio, fim, tipo=tipo)
     ontem_inicio = inicio - timedelta(days=1)
@@ -827,43 +806,51 @@ def render_dashboard_geral(conn):
 
     cols = st.columns(4 if has_permission("view_profit") else 3)
     with cols[0]:
-        show_fat = _render_clickable_card(
+        show_fat = tx_card(
             "Faturamento",
             moeda(faturamento),
             f"{quantidade} lançamentos • {periodo}",
-            "#16A34A",
-            "faturamento",
+            key="faturamento",
+            icon="💰",
+            accent="green",
+            state_key="dash_geral_open_card",
         )
         if show_fat:
             _render_metric_detail(conn, inicio, fim, "Detalhes do faturamento")
     with cols[1]:
-        show_serv = _render_clickable_card(
+        show_serv = tx_card(
             "Serviços",
             moeda(servicos),
             "Reparos e mão de obra",
-            "#2563EB",
-            "servicos",
+            key="servicos",
+            icon="🔧",
+            accent="blue",
+            state_key="dash_geral_open_card",
         )
         if show_serv:
             _render_metric_detail(conn, inicio, fim, "Detalhes de serviços", tipo="Serviço")
     with cols[2]:
-        show_prod = _render_clickable_card(
+        show_prod = tx_card(
             "Produtos",
             moeda(produtos),
             "Produtos vendidos",
-            "#F59E0B",
-            "produtos",
+            key="produtos",
+            icon="📦",
+            accent="amber",
+            state_key="dash_geral_open_card",
         )
         if show_prod:
             _render_metric_detail(conn, inicio, fim, "Detalhes de produtos", tipo="Produto")
     if has_permission("view_profit"):
         with cols[3]:
-            show_lucro = _render_clickable_card(
+            show_lucro = tx_card(
                 "Lucro estimado",
                 moeda(lucro),
                 f"Despesas: {moeda(despesas)}",
-                "#E63946",
-                "lucro",
+                key="lucro",
+                icon="📊",
+                accent="red",
+                state_key="dash_geral_open_card",
             )
             if show_lucro:
                 _render_profit_detail(faturamento, despesas, lucro)
@@ -887,29 +874,29 @@ def render_dashboard_geral(conn):
     st.subheader("Resumo financeiro")
     fin_cols = st.columns(3)
     with fin_cols[0]:
-        show = _render_clickable_card("Dinheiro", moeda(dinheiro), f"{qtd_dinheiro} venda(s)", "#16A34A", "dinheiro")
+        show = tx_card("Dinheiro", moeda(dinheiro), f"{qtd_dinheiro} venda(s)", key="dinheiro", icon="💵", accent="green", state_key="dash_geral_open_card")
         if show:
             _render_payment_detail(conn, inicio, fim, "Dinheiro", faturamento)
     with fin_cols[1]:
-        show = _render_clickable_card("Pix", moeda(pix), f"{qtd_pix} venda(s)", "#2563EB", "pix")
+        show = tx_card("Pix", moeda(pix), f"{qtd_pix} venda(s)", key="pix", icon="📲", accent="blue", state_key="dash_geral_open_card")
         if show:
             _render_payment_detail(conn, inicio, fim, "Pix", faturamento)
     with fin_cols[2]:
-        show = _render_clickable_card("Crédito", moeda(credito), f"{qtd_credito} venda(s)", "#5B8DEF", "credito")
+        show = tx_card("Crédito", moeda(credito), f"{qtd_credito} venda(s)", key="credito", icon="💳", accent="cyan", state_key="dash_geral_open_card")
         if show:
             _render_payment_detail(conn, inicio, fim, "Crédito", faturamento)
 
     fin_cols = st.columns(3)
     with fin_cols[0]:
-        show = _render_clickable_card("Débito", moeda(debito), f"{qtd_debito} venda(s)", "#F59E0B", "debito")
+        show = tx_card("Débito", moeda(debito), f"{qtd_debito} venda(s)", key="debito", icon="💳", accent="amber", state_key="dash_geral_open_card")
         if show:
             _render_payment_detail(conn, inicio, fim, "Débito", faturamento)
     with fin_cols[1]:
-        show = _render_clickable_card("Sangrias", moeda(sangrias_total), f"{sangrias_qtd} retirada(s) hoje", "#E63946", "sangrias")
+        show = tx_card("Sangrias", moeda(sangrias_total), f"{sangrias_qtd} retirada(s) hoje", key="sangrias", icon="💸", accent="red", state_key="dash_geral_open_card")
         if show:
             _render_sangria_detail(conn, hoje)
     with fin_cols[2]:
-        show = _render_clickable_card("Total Geral", moeda(faturamento), f"Meta {(faturamento / META_DIARIA_PADRAO * 100) if META_DIARIA_PADRAO else 0:.0f}%", "#111827", "total_geral")
+        show = tx_card("Total Geral", moeda(faturamento), f"Meta {(faturamento / META_DIARIA_PADRAO * 100) if META_DIARIA_PADRAO else 0:.0f}%", key="total_geral", icon="🏆", accent="dark", state_key="dash_geral_open_card")
         if show:
             _render_total_detail(conn, inicio, fim, financial_totals, META_DIARIA_PADRAO)
 

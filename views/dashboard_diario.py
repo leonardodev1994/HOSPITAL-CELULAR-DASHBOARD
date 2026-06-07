@@ -14,6 +14,7 @@ from utils.dashboard_ui import (
 )
 from utils.permissions import has_permission
 from utils.quiosques import scope_clause, scoped_params, user_can_view_all
+from utils.tx_components import tx_card
 
 
 FORMAS_PAGAMENTO = ["Dinheiro", "Pix", "Crédito", "Débito"]
@@ -295,29 +296,39 @@ def _trend_label(valor_atual, valor_anterior):
     return f"{seta} {sinal}{variacao:.0f}%"
 
 
-def _toggle_detail(key):
-    st.session_state[key] = not st.session_state.get(key, False)
-
-
 def _render_finance_card(title, value, detail, accent, key):
-    metric_card(title, _moeda(value), detail, accent)
-    st.button(
-        "ℹ️ Detalhes" if not st.session_state.get(key, False) else "Fechar detalhes",
-        key=f"toggle_{key}",
-        width="stretch",
-        on_click=_toggle_detail,
-        args=(key,),
+    accent_map = {
+        "#16A34A": "green",
+        "#18C29C": "blue",
+        "#5B8DEF": "cyan",
+        "#F59E0B": "amber",
+        "#E63946": "red",
+        "#111827": "dark",
+    }
+    return tx_card(
+        title,
+        _moeda(value),
+        detail,
+        key=key,
+        accent=accent_map.get(accent, "green"),
+        state_key="dashboard_diario_open_card",
     )
 
 
 def _render_clickable_metric(title, value, detail, accent, key):
-    metric_card(title, value, detail, accent)
-    st.button(
-        "ℹ️ Detalhes" if not st.session_state.get(key, False) else "Fechar detalhes",
-        key=f"toggle_{key}",
-        width="stretch",
-        on_click=_toggle_detail,
-        args=(key,),
+    accent_map = {
+        "#18C29C": "green",
+        "#5B8DEF": "cyan",
+        "#F59E0B": "amber",
+        "#EF4444": "red",
+    }
+    return tx_card(
+        title,
+        value,
+        detail,
+        key=key,
+        accent=accent_map.get(accent, "green"),
+        state_key="dashboard_diario_open_card",
     )
 
 
@@ -616,36 +627,23 @@ def _render_financial_summary(conn, data_filtro, df_pagamentos, df_pagamentos_an
     st.subheader("Resumo financeiro")
     c1, c2, c3 = st.columns(3)
     with c1:
-        _render_finance_card("💵 Dinheiro", totals["Dinheiro"], _trend_label(totals["Dinheiro"], previous["Dinheiro"]), "#16A34A", "finance_dinheiro")
+        if _render_finance_card("💵 Dinheiro", totals["Dinheiro"], _trend_label(totals["Dinheiro"], previous["Dinheiro"]), "#16A34A", "finance_dinheiro"):
+            _render_money_details(conn, data_filtro, df_pagamentos, totals["Dinheiro"])
     with c2:
-        _render_finance_card("📲 Pix", totals["Pix"], _trend_label(totals["Pix"], previous["Pix"]), "#18C29C", "finance_pix")
+        if _render_finance_card("📲 Pix", totals["Pix"], _trend_label(totals["Pix"], previous["Pix"]), "#18C29C", "finance_pix"):
+            _render_payment_details(df_pagamentos, "Pix", totals["Pix"], total)
     with c3:
-        _render_finance_card("💳 Crédito", totals["Crédito"], _trend_label(totals["Crédito"], previous["Crédito"]), "#5B8DEF", "finance_credito")
+        if _render_finance_card("💳 Crédito", totals["Crédito"], _trend_label(totals["Crédito"], previous["Crédito"]), "#5B8DEF", "finance_credito"):
+            _render_payment_details(df_pagamentos, "Crédito", totals["Crédito"], total)
     c1, c2, c3 = st.columns(3)
     with c1:
-        _render_finance_card("💳 Débito", totals["Débito"], _trend_label(totals["Débito"], previous["Débito"]), "#F59E0B", "finance_debito")
-    with c2:
-        _render_finance_card("💸 Sangrias", totals["sangrias"], ultima_sangria, "#E63946", "finance_sangrias")
-    with c3:
-        _render_finance_card("🏆 Total Geral", total, f"Meta {(total / meta) * 100 if meta else 0:.0f}%", "#111827", "finance_total")
-
-    if st.session_state.get("finance_dinheiro"):
-        with st.expander("Detalhes de Dinheiro", expanded=True):
-            _render_money_details(conn, data_filtro, df_pagamentos, totals["Dinheiro"])
-    if st.session_state.get("finance_pix"):
-        with st.expander("Detalhes de Pix", expanded=True):
-            _render_payment_details(df_pagamentos, "Pix", totals["Pix"], total)
-    if st.session_state.get("finance_credito"):
-        with st.expander("Detalhes de Crédito", expanded=True):
-            _render_payment_details(df_pagamentos, "Crédito", totals["Crédito"], total)
-    if st.session_state.get("finance_debito"):
-        with st.expander("Detalhes de Débito", expanded=True):
+        if _render_finance_card("💳 Débito", totals["Débito"], _trend_label(totals["Débito"], previous["Débito"]), "#F59E0B", "finance_debito"):
             _render_payment_details(df_pagamentos, "Débito", totals["Débito"], total)
-    if st.session_state.get("finance_sangrias"):
-        with st.expander("Histórico de Sangrias", expanded=True):
+    with c2:
+        if _render_finance_card("💸 Sangrias", totals["sangrias"], ultima_sangria, "#E63946", "finance_sangrias"):
             _render_sangria_details(conn, data_filtro)
-    if st.session_state.get("finance_total"):
-        with st.expander("Detalhes do Total Geral", expanded=True):
+    with c3:
+        if _render_finance_card("🏆 Total Geral", total, f"Meta {(total / meta) * 100 if meta else 0:.0f}%", "#111827", "finance_total"):
             _render_total_details(totals, meta)
 
 
@@ -782,24 +780,29 @@ def render_dashboard_diario(conn):
     cols = st.columns(4 if has_permission("view_profit") else 3)
     c1, c2, c3 = cols[:3]
     with c1:
-        _render_clickable_metric("💰 Faturamento", _moeda(total), diferenca_label, "#5B8DEF", "daily_detail_faturamento")
+        if _render_clickable_metric("💰 Faturamento", _moeda(total), diferenca_label, "#5B8DEF", "daily_detail_faturamento"):
+            _render_sales_card_details(df_dia)
     with c2:
-        _render_clickable_metric("🔧 Serviços", _moeda(servicos), f"{len(df_dia[df_dia['tipo'] == 'Serviço']) if not df_dia.empty else 0} lançamentos", "#18C29C", "daily_detail_servicos")
+        if _render_clickable_metric("🔧 Serviços", _moeda(servicos), f"{len(df_dia[df_dia['tipo'] == 'Serviço']) if not df_dia.empty else 0} lançamentos", "#18C29C", "daily_detail_servicos"):
+            _render_sales_card_details(df_dia, "Serviço")
     with c3:
-        _render_clickable_metric("📦 Produtos", _moeda(produtos), f"{len(df_dia[df_dia['tipo'] == 'Produto']) if not df_dia.empty else 0} vendas", "#F59E0B", "daily_detail_produtos")
+        if _render_clickable_metric("📦 Produtos", _moeda(produtos), f"{len(df_dia[df_dia['tipo'] == 'Produto']) if not df_dia.empty else 0} vendas", "#F59E0B", "daily_detail_produtos"):
+            _render_sales_card_details(df_dia, "Produto")
     if has_permission("view_profit"):
         with cols[3]:
-            metric_card("Lucro estimado", _moeda(lucro), f"Despesas: {_moeda(despesas)}", "#EF4444")
-
-    if st.session_state.get("daily_detail_faturamento"):
-        with st.expander("Detalhes do Faturamento", expanded=True):
-            _render_sales_card_details(df_dia)
-    if st.session_state.get("daily_detail_servicos"):
-        with st.expander("Detalhes dos Serviços", expanded=True):
-            _render_sales_card_details(df_dia, "Serviço")
-    if st.session_state.get("daily_detail_produtos"):
-        with st.expander("Detalhes dos Produtos", expanded=True):
-            _render_sales_card_details(df_dia, "Produto")
+            if tx_card(
+                "Lucro estimado",
+                _moeda(lucro),
+                f"Despesas: {_moeda(despesas)}",
+                key="daily_detail_lucro",
+                icon="📊",
+                accent="red",
+                state_key="dashboard_diario_open_card",
+            ):
+                c_l1, c_l2 = st.columns(2)
+                c_l1.metric("Faturamento", _moeda(total))
+                c_l2.metric("Despesas", _moeda(despesas))
+                st.caption("Lucro estimado = faturamento do dia menos despesas lançadas no dia.")
 
     st.divider()
 

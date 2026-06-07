@@ -20,6 +20,7 @@ from views.ordem_servico import render_ordem_servico
 from views.servicos import render_servicos
 from views.usuarios import render_usuarios
 from utils.auth import current_user, logout, require_login
+from utils.global_search import render_global_search
 from utils.permissions import MENU_PERMISSIONS, has_permission, visible_menu_items
 from utils.quiosques import render_quiosque_filter
 from utils.style import apply_style
@@ -222,5 +223,6 @@ render_mobile_navigation(user, auto_backup)
 menu = st.session_state["menu_atual"]
 
 render_quiosque_filter(conn, user)
+render_global_search(conn, available_menu_items)
 
 MENU_ITEMS[menu](conn)

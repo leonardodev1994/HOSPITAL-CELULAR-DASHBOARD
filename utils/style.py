@@ -2382,31 +2382,48 @@ def apply_style():
     }
 
     div[data-testid="stVerticalBlock"]:has(.tx-card-faturamento) .stButton button,
-    div[data-testid="stVerticalBlock"]:has(.tx-card-dinheiro) .stButton button {
+    div[data-testid="stVerticalBlock"]:has(.tx-card-dinheiro) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-accent-green) .stButton button {
         border-top-color: #16A34A !important;
     }
 
     div[data-testid="stVerticalBlock"]:has(.tx-card-servicos) .stButton button,
-    div[data-testid="stVerticalBlock"]:has(.tx-card-pix) .stButton button {
+    div[data-testid="stVerticalBlock"]:has(.tx-card-pix) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-accent-blue) .stButton button {
         border-top-color: #2563EB !important;
     }
 
     div[data-testid="stVerticalBlock"]:has(.tx-card-produtos) .stButton button,
-    div[data-testid="stVerticalBlock"]:has(.tx-card-debito) .stButton button {
+    div[data-testid="stVerticalBlock"]:has(.tx-card-debito) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-accent-amber) .stButton button {
         border-top-color: #F59E0B !important;
     }
 
     div[data-testid="stVerticalBlock"]:has(.tx-card-lucro) .stButton button,
-    div[data-testid="stVerticalBlock"]:has(.tx-card-sangrias) .stButton button {
+    div[data-testid="stVerticalBlock"]:has(.tx-card-sangrias) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-accent-red) .stButton button {
         border-top-color: #E63946 !important;
     }
 
-    div[data-testid="stVerticalBlock"]:has(.tx-card-credito) .stButton button {
+    div[data-testid="stVerticalBlock"]:has(.tx-card-credito) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-accent-cyan) .stButton button {
         border-top-color: #5B8DEF !important;
     }
 
-    div[data-testid="stVerticalBlock"]:has(.tx-card-total_geral) .stButton button {
+    div[data-testid="stVerticalBlock"]:has(.tx-card-total_geral) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-accent-dark) .stButton button {
         border-top-color: #111827 !important;
+    }
+
+    .tx-global-search-wrap {
+        margin: 0 0 1rem;
+    }
+
+    .tx-global-search-wrap + div [data-testid="stTextInput"] input,
+    [data-testid="stTextInput"] input[aria-label="Pesquisa Global TX"] {
+        border-radius: 14px !important;
+        border-color: rgba(22, 163, 74, .32) !important;
+        box-shadow: 0 10px 26px rgba(17, 24, 39, .06) !important;
     }
 
     .dash-card strong {
