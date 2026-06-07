@@ -2353,6 +2353,62 @@ def apply_style():
         box-shadow: 0 16px 36px rgba(17, 24, 39, .10) !important;
     }
 
+    div[data-testid="stVerticalBlock"]:has(.tx-click-card-marker) .stButton button {
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        border-top: 4px solid var(--card-accent, var(--accent-2)) !important;
+        border-radius: 16px !important;
+        box-shadow: var(--shadow-soft) !important;
+        color: var(--text) !important;
+        cursor: pointer !important;
+        font-weight: 850 !important;
+        min-height: 126px;
+        padding: 16px 18px !important;
+        text-align: left !important;
+        white-space: pre-line !important;
+        width: 100% !important;
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-click-card-marker) .stButton button:hover {
+        background: #F8FAFC !important;
+        border-color: rgba(22, 163, 74, .42) !important;
+        box-shadow: 0 16px 36px rgba(17, 24, 39, .10) !important;
+        transform: translateY(-1px);
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-click-card-marker) .stButton button:active {
+        transform: translateY(0);
+        box-shadow: 0 8px 20px rgba(17, 24, 39, .08) !important;
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-card-faturamento) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-dinheiro) .stButton button {
+        border-top-color: #16A34A !important;
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-card-servicos) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-pix) .stButton button {
+        border-top-color: #2563EB !important;
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-card-produtos) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-debito) .stButton button {
+        border-top-color: #F59E0B !important;
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-card-lucro) .stButton button,
+    div[data-testid="stVerticalBlock"]:has(.tx-card-sangrias) .stButton button {
+        border-top-color: #E63946 !important;
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-card-credito) .stButton button {
+        border-top-color: #5B8DEF !important;
+    }
+
+    div[data-testid="stVerticalBlock"]:has(.tx-card-total_geral) .stButton button {
+        border-top-color: #111827 !important;
+    }
+
     .dash-card strong {
         color: #111827 !important;
         text-shadow: none !important;

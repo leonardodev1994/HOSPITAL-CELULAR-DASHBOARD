@@ -1,10 +1,11 @@
 from datetime import date, datetime, timedelta
 from textwrap import dedent
+from unicodedata import normalize
 
 import pandas as pd
 import streamlit as st
 
-from utils.dashboard_ui import PLOTLY_CONFIG, empty_state, metric_card, moeda, page_banner, page_header, pie_chart
+from utils.dashboard_ui import PLOTLY_CONFIG, empty_state, moeda, page_banner, page_header, pie_chart
 from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause, user_can_view_all
 
@@ -37,6 +38,11 @@ def _safe_float(value):
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _normalize_text(value):
+    text = normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
+    return " ".join(text.lower().split())
 
 
 def _pct(value, total):
@@ -123,6 +129,78 @@ def _pagamentos_periodo(conn, inicio, fim):
         """,
         conn,
         params=(inicio.isoformat(), fim.isoformat()) + params,
+    )
+
+
+def _payment_patterns(label):
+    label = _normalize_text(label)
+    aliases = {
+        "dinheiro": ["dinheiro"],
+        "pix": ["pix"],
+        "credito": ["credito", "crédito"],
+        "debito": ["debito", "débito"],
+    }
+    return aliases.get(label, [label])
+
+
+def _payment_total_from_summary(df_pagamentos, label):
+    patterns = [_normalize_text(pattern) for pattern in _payment_patterns(label)]
+    total = 0.0
+    quantidade = 0
+    for row in df_pagamentos.itertuples():
+        forma = _normalize_text(row.forma_pagamento)
+        if any(pattern in forma for pattern in patterns):
+            total += _safe_float(row.valor)
+            quantidade += int(getattr(row, "quantidade", 0) or 0)
+    return total, quantidade
+
+
+def _payment_stats(conn, inicio, fim, label):
+    scope, params = scope_clause("l", prefix="AND")
+    patterns = _payment_patterns(label)
+    like_clause = " OR ".join(["LOWER(COALESCE(p.forma_pagamento, '')) LIKE ?"] * len(patterns))
+    row = pd.read_sql_query(
+        f"""
+        SELECT COALESCE(SUM(p.valor), 0) AS valor, COUNT(*) AS quantidade, COALESCE(AVG(p.valor), 0) AS ticket
+        FROM pagamentos p
+        INNER JOIN lancamentos l ON l.id = p.lancamento_id
+        WHERE l.data >= ?
+          AND l.data <= ?
+          AND COALESCE(l.status, 'Ativo') <> 'Cancelado'
+          AND ({like_clause})
+          {scope}
+        """,
+        conn,
+        params=(inicio.isoformat(), fim.isoformat()) + tuple(f"%{pattern.lower()}%" for pattern in patterns) + params,
+    )
+    if row.empty:
+        return 0.0, 0, 0.0
+    return (
+        _safe_float(row.iloc[0]["valor"]),
+        int(row.iloc[0]["quantidade"] or 0),
+        _safe_float(row.iloc[0]["ticket"]),
+    )
+
+
+def _latest_payments(conn, inicio, fim, label, limit=5):
+    scope, params = scope_clause("l", prefix="AND")
+    patterns = _payment_patterns(label)
+    like_clause = " OR ".join(["LOWER(COALESCE(p.forma_pagamento, '')) LIKE ?"] * len(patterns))
+    return pd.read_sql_query(
+        f"""
+        SELECT l.data, l.descricao, p.forma_pagamento, p.valor
+        FROM pagamentos p
+        INNER JOIN lancamentos l ON l.id = p.lancamento_id
+        WHERE l.data >= ?
+          AND l.data <= ?
+          AND COALESCE(l.status, 'Ativo') <> 'Cancelado'
+          AND ({like_clause})
+          {scope}
+        ORDER BY l.data DESC, p.id DESC
+        LIMIT ?
+        """,
+        conn,
+        params=(inicio.isoformat(), fim.isoformat()) + tuple(f"%{pattern.lower()}%" for pattern in patterns) + params + (int(limit),),
     )
 
 
@@ -403,14 +481,26 @@ def _render_goal_card(meta, faturado):
     )
 
 
-def _toggle_detail(key):
-    st.session_state[key] = not st.session_state.get(key, False)
+def _set_open_card(card_id):
+    current = st.session_state.get("dash_geral_open_card")
+    st.session_state["dash_geral_open_card"] = None if current == card_id else card_id
 
 
-def _render_metric_with_detail(label, value, detail, accent, key):
-    metric_card(label, value, detail, accent)
-    st.button("ℹ️ Detalhes", key=f"{key}_btn", on_click=_toggle_detail, args=(key,), width="stretch")
-    return st.session_state.get(key, False)
+def _render_clickable_card(label, value, detail, accent, card_id):
+    is_open = st.session_state.get("dash_geral_open_card") == card_id
+    arrow = "▲" if is_open else "▼"
+    st.markdown(
+        f"<span class='tx-click-card-marker tx-card-{card_id}'></span>",
+        unsafe_allow_html=True,
+    )
+    st.button(
+        f"{label}  {arrow}\n{value}\n{detail}",
+        key=f"dash_geral_card_{card_id}",
+        on_click=_set_open_card,
+        args=(card_id,),
+        width="stretch",
+    )
+    return is_open
 
 
 def _render_metric_detail(conn, inicio, fim, title, tipo=None):
@@ -443,6 +533,103 @@ def _render_metric_detail(conn, inicio, fim, title, tipo=None):
         )
     else:
         empty_state("Nenhum lançamento relacionado neste período.")
+
+
+def _render_profit_detail(faturamento, despesas, lucro):
+    st.markdown("**Detalhes do resultado operacional**")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Faturamento", moeda(faturamento))
+    c2.metric("Despesas", moeda(despesas))
+    c3.metric("Resultado", moeda(lucro))
+    st.caption("Resultado estimado calculado pelo faturamento do período menos despesas registradas.")
+
+
+def _render_payment_detail(conn, inicio, fim, label, total_geral):
+    total, quantidade, ticket = _payment_stats(conn, inicio, fim, label)
+    participacao = (total / total_geral * 100) if total_geral else 0
+    st.markdown(f"**Detalhes de {label}**")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total recebido", moeda(total))
+    c2.metric("Quantidade", quantidade)
+    c3.metric("Ticket médio", moeda(ticket))
+    st.caption(f"Participação no faturamento do período: {participacao:.0f}%")
+
+    latest = _latest_payments(conn, inicio, fim, label, limit=5)
+    if latest.empty:
+        empty_state(f"Nenhum pagamento em {label.lower()} neste período.")
+        return
+
+    st.dataframe(
+        latest.rename(
+            columns={
+                "data": "Data",
+                "descricao": "Descrição",
+                "forma_pagamento": "Forma",
+                "valor": "Valor",
+            }
+        ),
+        hide_index=True,
+        width="stretch",
+        column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
+    )
+
+
+def _render_sangria_detail(conn, day):
+    total, quantidade = _sangrias_total(conn, day)
+    latest = _ultima_sangria(conn, day)
+    st.markdown("**Detalhes de sangrias**")
+    c1, c2 = st.columns(2)
+    c1.metric("Total do dia", moeda(total))
+    c2.metric("Quantidade", quantidade)
+
+    if not latest.empty:
+        row = latest.iloc[0]
+        actor = row.get("retirado_por") or row.get("usuario_nome") or "Não informado"
+        st.caption(f"Última retirada: {str(row.get('data_hora') or '')[11:16]} - {actor} • {moeda(row.get('valor'))}")
+
+    history = _historico_sangrias(conn, day, limit=5)
+    if history.empty:
+        empty_state("Nenhuma sangria registrada hoje.")
+        return
+
+    st.dataframe(
+        history.rename(
+            columns={
+                "data_hora": "Data/Hora",
+                "quiosque": "Quiosque",
+                "retirado_por": "Retirado por",
+                "usuario_nome": "Usuário",
+                "valor": "Valor",
+                "observacao": "Observação",
+            }
+        ),
+        hide_index=True,
+        width="stretch",
+        column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
+    )
+
+
+def _render_total_detail(conn, inicio, fim, totals, meta):
+    total = totals["total"]
+    st.markdown("**Detalhes do Total Geral**")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Faturamento bruto", moeda(total))
+    c2.metric("Sangrias hoje", moeda(totals["sangrias"]))
+    c3.metric("Meta atingida", f"{(total / meta * 100) if meta else 0:.0f}%")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Dinheiro", moeda(totals["Dinheiro"]))
+    c2.metric("Pix", moeda(totals["Pix"]))
+    c3.metric("Crédito", moeda(totals["Crédito"]))
+    c4.metric("Débito", moeda(totals["Débito"]))
+
+    latest = _ultimos_lancamentos(conn, inicio, fim, limit=5)
+    if not latest.empty:
+        st.dataframe(
+            latest.rename(columns={"data": "Data", "tipo": "Tipo", "descricao": "Descrição", "valor": "Valor"}),
+            hide_index=True,
+            width="stretch",
+            column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
+        )
 
 
 def _render_manager_attention(alerts):
@@ -616,6 +803,7 @@ def render_dashboard_geral(conn):
     )
 
     hoje = _today()
+    st.session_state.setdefault("dash_geral_open_card", None)
     periodo = st.segmented_control("Período", ["Hoje", "Semana", "Mês"], default="Hoje", key="dash_geral_periodo")
     inicio, fim = _date_period(periodo)
 
@@ -639,48 +827,91 @@ def render_dashboard_geral(conn):
 
     cols = st.columns(4 if has_permission("view_profit") else 3)
     with cols[0]:
-        show_fat = _render_metric_with_detail(
+        show_fat = _render_clickable_card(
             "Faturamento",
             moeda(faturamento),
             f"{quantidade} lançamentos • {periodo}",
             "#16A34A",
-            "dash_geral_faturamento_detail",
+            "faturamento",
         )
+        if show_fat:
+            _render_metric_detail(conn, inicio, fim, "Detalhes do faturamento")
     with cols[1]:
-        show_serv = _render_metric_with_detail(
+        show_serv = _render_clickable_card(
             "Serviços",
             moeda(servicos),
             "Reparos e mão de obra",
             "#2563EB",
-            "dash_geral_servicos_detail",
+            "servicos",
         )
+        if show_serv:
+            _render_metric_detail(conn, inicio, fim, "Detalhes de serviços", tipo="Serviço")
     with cols[2]:
-        show_prod = _render_metric_with_detail(
+        show_prod = _render_clickable_card(
             "Produtos",
             moeda(produtos),
             "Produtos vendidos",
             "#F59E0B",
-            "dash_geral_produtos_detail",
+            "produtos",
         )
-    show_lucro = False
+        if show_prod:
+            _render_metric_detail(conn, inicio, fim, "Detalhes de produtos", tipo="Produto")
     if has_permission("view_profit"):
         with cols[3]:
-            show_lucro = _render_metric_with_detail(
+            show_lucro = _render_clickable_card(
                 "Lucro estimado",
                 moeda(lucro),
                 f"Despesas: {moeda(despesas)}",
                 "#E63946",
-                "dash_geral_lucro_detail",
+                "lucro",
             )
+            if show_lucro:
+                _render_profit_detail(faturamento, despesas, lucro)
 
-    if show_fat:
-        _render_metric_detail(conn, inicio, fim, "Detalhes do faturamento")
-    if show_serv:
-        _render_metric_detail(conn, inicio, fim, "Detalhes de serviços", tipo="Serviço")
-    if show_prod:
-        _render_metric_detail(conn, inicio, fim, "Detalhes de produtos", tipo="Produto")
-    if show_lucro:
-        st.info(f"Lucro estimado considera faturamento do período menos despesas registradas: {moeda(lucro)}.")
+    st.divider()
+
+    dinheiro, qtd_dinheiro = _payment_total_from_summary(df_pagamentos, "Dinheiro")
+    pix, qtd_pix = _payment_total_from_summary(df_pagamentos, "Pix")
+    credito, qtd_credito = _payment_total_from_summary(df_pagamentos, "Crédito")
+    debito, qtd_debito = _payment_total_from_summary(df_pagamentos, "Débito")
+    sangrias_total, sangrias_qtd = _sangrias_total(conn, hoje)
+    financial_totals = {
+        "Dinheiro": dinheiro,
+        "Pix": pix,
+        "Crédito": credito,
+        "Débito": debito,
+        "sangrias": sangrias_total,
+        "total": faturamento,
+    }
+
+    st.subheader("Resumo financeiro")
+    fin_cols = st.columns(3)
+    with fin_cols[0]:
+        show = _render_clickable_card("Dinheiro", moeda(dinheiro), f"{qtd_dinheiro} venda(s)", "#16A34A", "dinheiro")
+        if show:
+            _render_payment_detail(conn, inicio, fim, "Dinheiro", faturamento)
+    with fin_cols[1]:
+        show = _render_clickable_card("Pix", moeda(pix), f"{qtd_pix} venda(s)", "#2563EB", "pix")
+        if show:
+            _render_payment_detail(conn, inicio, fim, "Pix", faturamento)
+    with fin_cols[2]:
+        show = _render_clickable_card("Crédito", moeda(credito), f"{qtd_credito} venda(s)", "#5B8DEF", "credito")
+        if show:
+            _render_payment_detail(conn, inicio, fim, "Crédito", faturamento)
+
+    fin_cols = st.columns(3)
+    with fin_cols[0]:
+        show = _render_clickable_card("Débito", moeda(debito), f"{qtd_debito} venda(s)", "#F59E0B", "debito")
+        if show:
+            _render_payment_detail(conn, inicio, fim, "Débito", faturamento)
+    with fin_cols[1]:
+        show = _render_clickable_card("Sangrias", moeda(sangrias_total), f"{sangrias_qtd} retirada(s) hoje", "#E63946", "sangrias")
+        if show:
+            _render_sangria_detail(conn, hoje)
+    with fin_cols[2]:
+        show = _render_clickable_card("Total Geral", moeda(faturamento), f"Meta {(faturamento / META_DIARIA_PADRAO * 100) if META_DIARIA_PADRAO else 0:.0f}%", "#111827", "total_geral")
+        if show:
+            _render_total_detail(conn, inicio, fim, financial_totals, META_DIARIA_PADRAO)
 
     st.divider()
 
@@ -688,15 +919,12 @@ def render_dashboard_geral(conn):
     with left:
         _render_manager_attention(alerts)
     with right:
-        _render_sangria_card(conn, hoje)
+        _render_os_card(conn)
 
     st.divider()
 
-    rank_col, os_col = st.columns([1.1, 0.9])
-    with rank_col:
+    with st.container():
         _render_quiosque_ranking(conn, inicio, fim)
-    with os_col:
-        _render_os_card(conn)
 
     st.divider()
 
