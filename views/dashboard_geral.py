@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from textwrap import dedent
 
 import pandas as pd
 import streamlit as st
@@ -470,7 +471,7 @@ def _render_quiosque_ranking(conn, inicio, fim):
     rows = []
     for idx, row in enumerate(df.itertuples()):
         rows.append(
-            f"""
+            dedent(f"""
             <div class="ranking-row">
                 <em>{medals[idx] if idx < len(medals) else idx + 1}</em>
                 <div>
@@ -479,16 +480,16 @@ def _render_quiosque_ranking(conn, inicio, fim):
                 </div>
                 <strong>{moeda(row.faturamento)}</strong>
             </div>
-            """
+            """).strip()
         )
 
     st.markdown(
-        f"""
+        dedent(f"""
         <div class="ranking-card">
             <strong>Ranking dos Quiosques</strong>
             {''.join(rows)}
         </div>
-        """,
+        """).strip(),
         unsafe_allow_html=True,
     )
 
@@ -505,12 +506,12 @@ def _render_payment_values(df_pagamentos):
     for label, color in aliases:
         total = sum(value for key, value in values.items() if label.lower() in key)
         cards.append(
-            f"""
+            dedent(f"""
             <div style="--pay-accent:{color};">
                 <span>{label}</span>
                 <strong>{moeda(total)}</strong>
             </div>
-            """
+            """).strip()
         )
     st.markdown(f"<div class='payment-value-grid'>{''.join(cards)}</div>", unsafe_allow_html=True)
 
@@ -524,7 +525,7 @@ def _render_mix_servicos_produtos(servicos, produtos):
         return
 
     st.markdown(
-        f"""
+        dedent(f"""
         <div class="tx-mix-card">
             <strong>Serviços x Produtos</strong>
             <p>Mix de faturamento do período</p>
@@ -537,7 +538,7 @@ def _render_mix_servicos_produtos(servicos, produtos):
                 <div class="tx-mix-track"><i style="width:{prod_pct}%; background:#E63946;"></i></div>
             </div>
         </div>
-        """,
+        """).strip(),
         unsafe_allow_html=True,
     )
 

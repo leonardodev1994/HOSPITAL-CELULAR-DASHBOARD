@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from textwrap import dedent
 
 import pandas as pd
 import streamlit as st
@@ -60,13 +61,13 @@ def _render_mix_servicos_produtos(servicos, produtos):
     active = [row for row in rows if row[1] > 0]
     if len(active) == 1:
         st.markdown(
-            f"""
+            dedent(f"""
             <div class="tx-mix-card">
                 <strong>Serviços x Produtos</strong>
                 <p>Serviços: {_moeda(servicos)}</p>
                 <p>Produtos: {_moeda(produtos)}</p>
             </div>
-            """,
+            """).strip(),
             unsafe_allow_html=True,
         )
         return
@@ -75,20 +76,20 @@ def _render_mix_servicos_produtos(servicos, produtos):
     for label, value, color in rows:
         percent = (value / total) * 100 if total else 0
         bars.append(
-            f"""
+            dedent(f"""
             <div class="tx-mix-row">
                 <div><strong>{label}</strong><span>{_moeda(value)} · {percent:.0f}%</span></div>
                 <div class="tx-mix-track"><i style="width:{percent:.2f}%; background:{color};"></i></div>
             </div>
-            """
+            """).strip()
         )
     st.markdown(
-        f"""
+        dedent(f"""
         <div class="tx-mix-card">
             <strong>Serviços x Produtos</strong>
             {''.join(bars)}
         </div>
-        """,
+        """).strip(),
         unsafe_allow_html=True,
     )
 
@@ -487,13 +488,13 @@ def _render_quiosque_ranking(conn, selected_date):
     items = []
     for index, row in enumerate(ranking.itertuples()):
         items.append(
-            f"""
+            dedent(f"""
             <div class="ranking-row">
                 <span>{medals[index]}</span>
                 <strong>{row.quiosque}</strong>
                 <em>{_moeda(row.faturamento)}</em>
             </div>
-            """
+            """).strip()
         )
     st.markdown(f"<div class='ranking-card'>{''.join(items)}</div>", unsafe_allow_html=True)
 
