@@ -436,10 +436,11 @@ def _validate_stock(items, df_estoque):
         if item["tipo"] != "Produto":
             continue
         produto_id = int(item["produto_id"])
-        produtos[produto_id] = produtos.get(produto_id, 0) + float(item["quantidade"])
+        quiosque_id = int(item.get("quiosque_id") or current_quiosque_id())
+        produtos[(produto_id, quiosque_id)] = produtos.get((produto_id, quiosque_id), 0) + float(item["quantidade"])
 
-    for produto_id, quantidade in produtos.items():
-        produto = df_estoque[df_estoque["id"] == produto_id]
+    for (produto_id, quiosque_id), quantidade in produtos.items():
+        produto = df_estoque[(df_estoque["id"] == produto_id) & (df_estoque["quiosque_id"] == quiosque_id)]
         if produto.empty:
             return False, "Produto não encontrado no estoque."
 
@@ -472,6 +473,17 @@ def _save_cart(conn, data, items, pagamentos, user=None):
     item_totals = [_item_total(item) for item in items]
     total = sum(item_totals)
     lancamento_ids = []
+    lancamento_quiosques = []
+    sale_quiosque_id = int(
+        next(
+            (
+                item.get("quiosque_id")
+                for item in items
+                if item.get("tipo") == "Produto" and item.get("quiosque_id")
+            ),
+            current_quiosque_id(user),
+        )
+    )
 
     venda_id = execute_insert_returning_id(conn, cursor, """
     INSERT INTO vendas (data, total, status, usuario_id, usuario_nome, quiosque_id)
@@ -482,10 +494,11 @@ def _save_cart(conn, data, items, pagamentos, user=None):
         "Ativa",
         None if not user else user.get("id"),
         None if not user else user.get("nome"),
-        current_quiosque_id(user),
+        sale_quiosque_id,
     ))
 
     for item in items:
+        item_quiosque_id = int(item.get("quiosque_id") or sale_quiosque_id)
         preco_original = item.get("preco_original")
         preco_vendido = item.get("preco_vendido", item.get("valor_unitario"))
         diferenca_preco = item.get("diferenca_preco")
@@ -520,7 +533,7 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             item.get("produto_id"),
             item["quantidade"] if item["tipo"] == "Produto" else None,
             venda_id,
-            current_quiosque_id(user),
+            item_quiosque_id,
             preco_original,
             preco_vendido if has_reference_price else None,
             diferenca_preco,
@@ -529,6 +542,7 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             data_hora_preco,
         ))
         lancamento_ids.append(lancamento_id)
+        lancamento_quiosques.append(item_quiosque_id)
 
         venda_item_id = execute_insert_returning_id(conn, cursor, """
         INSERT INTO venda_itens (
@@ -564,26 +578,32 @@ def _save_cart(conn, data, items, pagamentos, user=None):
             observacao_preco,
             usuario_responsavel if has_reference_price else None,
             data_hora_preco,
-            current_quiosque_id(user),
+            item_quiosque_id,
         ))
 
         cursor.execute(
             "UPDATE lancamentos SET venda_item_id = ? WHERE id = ? AND quiosque_id = ?",
-            (venda_item_id, lancamento_id, current_quiosque_id(user)),
+            (venda_item_id, lancamento_id, item_quiosque_id),
         )
         conn.commit()
 
         if item["tipo"] == "Produto":
-            reduce_stock(conn, item["produto_id"], item["quantidade"], lancamento_id=lancamento_id)
+            reduce_stock(
+                conn,
+                item["produto_id"],
+                item["quantidade"],
+                lancamento_id=lancamento_id,
+                quiosque_id=item_quiosque_id,
+            )
 
     for forma, valor in pagamentos:
         parcelas = _split_payment(valor, item_totals, total)
-        for lancamento_id, parcela in zip(lancamento_ids, parcelas):
+        for lancamento_id, lancamento_quiosque_id, parcela in zip(lancamento_ids, lancamento_quiosques, parcelas):
             if parcela > 0:
                 cursor.execute("""
                 INSERT INTO pagamentos (lancamento_id, forma_pagamento, valor, quiosque_id)
                 VALUES (?, ?, ?, ?)
-                """, (lancamento_id, forma, parcela, current_quiosque_id(user)))
+                """, (lancamento_id, forma, parcela, lancamento_quiosque_id))
 
     conn.commit()
     log_action(
@@ -842,6 +862,7 @@ def render_novo_lancamento(conn):
                                         "tipo": "Produto",
                                         "descricao": descricao,
                                         "produto_id": int(produto_id),
+                                        "quiosque_id": int(produto.get("quiosque_id") or current_quiosque_id(user)),
                                         "quantidade": float(quantidade),
                                         "valor_unitario": float(valor_unitario),
                                         "preco_original": preco_cadastrado,

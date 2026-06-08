@@ -658,7 +658,7 @@ def load_stock_movements(conn, limit=50):
     """, conn, params=params + (limit,))
 
 
-def register_stock_movement(conn, produto_id, tipo, quantidade, motivo, lancamento_id=None, responsavel="Sistema"):
+def register_stock_movement(conn, produto_id, tipo, quantidade, motivo, lancamento_id=None, responsavel="Sistema", quiosque_id=None):
     cursor = conn.cursor()
     cursor.execute("""
     INSERT INTO estoque_movimentacoes (
@@ -680,16 +680,17 @@ def register_stock_movement(conn, produto_id, tipo, quantidade, motivo, lancamen
         motivo,
         lancamento_id,
         responsavel,
-        current_quiosque_id(),
+        int(quiosque_id or current_quiosque_id()),
     ))
     conn.commit()
 
 
-def reduce_stock(conn, produto_id, quantidade, lancamento_id=None):
+def reduce_stock(conn, produto_id, quantidade, lancamento_id=None, quiosque_id=None):
     cursor = conn.cursor()
+    quiosque_id = int(quiosque_id or current_quiosque_id())
     produto = cursor.execute(
         "SELECT quantidade FROM estoque WHERE id = ? AND quiosque_id = ?",
-        (produto_id, current_quiosque_id()),
+        (produto_id, quiosque_id),
     ).fetchone()
 
     if not produto:
@@ -705,7 +706,7 @@ def reduce_stock(conn, produto_id, quantidade, lancamento_id=None):
     UPDATE estoque
     SET quantidade = ?, atualizado_em = CURRENT_TIMESTAMP
     WHERE id = ? AND quiosque_id = ?
-    """, (nova_quantidade, produto_id, current_quiosque_id()))
+    """, (nova_quantidade, produto_id, quiosque_id))
     conn.commit()
 
     register_stock_movement(
@@ -715,6 +716,7 @@ def reduce_stock(conn, produto_id, quantidade, lancamento_id=None):
         quantidade,
         "Venda em lançamento",
         lancamento_id=lancamento_id,
+        quiosque_id=quiosque_id,
     )
 
 
