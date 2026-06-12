@@ -158,6 +158,51 @@ def _search_lancamentos(conn, term):
     )
 
 
+def _search_compra_aparelhos(conn, term):
+    scope, scope_params = scope_clause("a", prefix="AND")
+    like = _like_param(term)
+    return _run_query(
+        conn,
+        f"""
+        SELECT 'Compra de Aparelhos' AS modulo,
+               COALESCE(a.marca, '') || ' ' || COALESCE(a.modelo, '') AS titulo,
+               COALESCE(a.cliente, '') || ' • ' || COALESCE(a.imei, '') || ' • ' ||
+               COALESCE(a.status, '') AS detalhe,
+               'Compra de Aparelhos' AS menu
+        FROM aparelho_compras a
+        WHERE LOWER(COALESCE(a.cliente, '') || ' ' || COALESCE(a.cpf, '') || ' ' ||
+                    COALESCE(a.telefone, '') || ' ' || COALESCE(a.imei, '') || ' ' ||
+                    COALESCE(a.marca, '') || ' ' || COALESCE(a.modelo, '') || ' ' ||
+                    COALESCE(a.status, '')) LIKE ?
+          {scope}
+        ORDER BY a.id DESC
+        LIMIT ?
+        """,
+        (like,) + scope_params + (SEARCH_LIMIT_PER_MODULE,),
+    )
+
+
+def _search_seminovos(conn, term):
+    scope, scope_params = scope_clause("s", prefix="AND")
+    like = _like_param(term)
+    return _run_query(
+        conn,
+        f"""
+        SELECT 'Seminovos' AS modulo,
+               COALESCE(s.codigo_interno, 'Seminovo') || ' • ' || COALESCE(s.modelo, '') AS titulo,
+               COALESCE(s.imei, '') || ' • ' || COALESCE(s.status, '') AS detalhe,
+               'Compra de Aparelhos' AS menu
+        FROM seminovos_estoque s
+        WHERE LOWER(COALESCE(s.codigo_interno, '') || ' ' || COALESCE(s.imei, '') || ' ' ||
+                    COALESCE(s.modelo, '') || ' ' || COALESCE(s.status, '')) LIKE ?
+          {scope}
+        ORDER BY s.id DESC
+        LIMIT ?
+        """,
+        (like,) + scope_params + (SEARCH_LIMIT_PER_MODULE,),
+    )
+
+
 def _search_all(conn, raw_term):
     term = normalize_search_text(raw_term)
     if len(term) < 2:
@@ -170,6 +215,8 @@ def _search_all(conn, raw_term):
         _search_catalogo(conn, term),
         _search_servicos(conn, term),
         _search_lancamentos(conn, term),
+        _search_compra_aparelhos(conn, term),
+        _search_seminovos(conn, term),
     ]
     return pd.concat(results, ignore_index=True)
 

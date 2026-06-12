@@ -135,6 +135,7 @@ MIGRATIONS = [
     ("0010_catalogo_pecas", "_migration_0010_catalogo_pecas"),
     ("0011_catalogo_precos", "_migration_0011_catalogo_precos"),
     ("0012_auditoria_indices", "_migration_0012_auditoria_indices"),
+    ("0013_compra_aparelhos", "_migration_0013_compra_aparelhos"),
 ]
 
 
@@ -293,6 +294,14 @@ def _migration_0012_auditoria_indices(conn):
         return
 
     _create_sqlite_audit_indexes(conn)
+
+
+def _migration_0013_compra_aparelhos(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_device_purchase_schema(conn)
+        return
+
+    _create_sqlite_device_purchase_schema(conn)
 
 
 def ensure_catalog_price_schema(conn):
@@ -1330,6 +1339,222 @@ def _create_postgres_audit_indexes(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_quiosque_id ON auditoria(quiosque_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_acao ON auditoria(acao)")
+
+
+def _create_sqlite_device_purchase_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_compras (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente TEXT NOT NULL,
+        cpf TEXT,
+        telefone TEXT,
+        documento TEXT,
+        imei TEXT,
+        marca TEXT,
+        modelo TEXT,
+        cor TEXT,
+        capacidade TEXT,
+        estado_fisico TEXT,
+        observacoes TEXT,
+        data_entrada TEXT,
+        valor_sugerido REAL DEFAULT 0,
+        valor_final REAL DEFAULT 0,
+        forma_pagamento TEXT,
+        status TEXT DEFAULT 'Em avaliação',
+        atendente_id INTEGER,
+        atendente_nome TEXT,
+        aprovado_por_id INTEGER,
+        aprovado_por_nome TEXT,
+        concluido_por_id INTEGER,
+        concluido_por_nome TEXT,
+        termo_html TEXT,
+        termo_gerado_em TEXT,
+        quiosque_id INTEGER,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_checklists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        aparelho_id INTEGER NOT NULL,
+        etapa TEXT NOT NULL,
+        item TEXT NOT NULL,
+        valor TEXT,
+        observacao TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_anexos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        aparelho_id INTEGER NOT NULL,
+        tipo TEXT,
+        nome_arquivo TEXT,
+        caminho TEXT,
+        mime_type TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_historico (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        aparelho_id INTEGER NOT NULL,
+        data_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        acao TEXT,
+        detalhes TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS seminovos_estoque (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        aparelho_id INTEGER NOT NULL,
+        codigo_interno TEXT,
+        imei TEXT,
+        modelo TEXT,
+        cor TEXT,
+        capacidade TEXT,
+        custo_compra REAL DEFAULT 0,
+        custo_reparo REAL DEFAULT 0,
+        custo_total REAL DEFAULT 0,
+        valor_venda REAL DEFAULT 0,
+        lucro_estimado REAL DEFAULT 0,
+        status TEXT DEFAULT 'Disponível',
+        vendido_em TEXT,
+        comprador TEXT,
+        termo_venda_html TEXT,
+        quiosque_id INTEGER,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    _create_device_purchase_indexes(cursor)
+
+
+def _create_postgres_device_purchase_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("SET LOCAL lock_timeout = '5s'")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_compras (
+        id SERIAL PRIMARY KEY,
+        cliente TEXT NOT NULL,
+        cpf TEXT,
+        telefone TEXT,
+        documento TEXT,
+        imei TEXT,
+        marca TEXT,
+        modelo TEXT,
+        cor TEXT,
+        capacidade TEXT,
+        estado_fisico TEXT,
+        observacoes TEXT,
+        data_entrada TEXT,
+        valor_sugerido DOUBLE PRECISION DEFAULT 0,
+        valor_final DOUBLE PRECISION DEFAULT 0,
+        forma_pagamento TEXT,
+        status TEXT DEFAULT 'Em avaliação',
+        atendente_id INTEGER,
+        atendente_nome TEXT,
+        aprovado_por_id INTEGER,
+        aprovado_por_nome TEXT,
+        concluido_por_id INTEGER,
+        concluido_por_nome TEXT,
+        termo_html TEXT,
+        termo_gerado_em TIMESTAMP,
+        quiosque_id INTEGER,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_checklists (
+        id SERIAL PRIMARY KEY,
+        aparelho_id INTEGER NOT NULL,
+        etapa TEXT NOT NULL,
+        item TEXT NOT NULL,
+        valor TEXT,
+        observacao TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_anexos (
+        id SERIAL PRIMARY KEY,
+        aparelho_id INTEGER NOT NULL,
+        tipo TEXT,
+        nome_arquivo TEXT,
+        caminho TEXT,
+        mime_type TEXT,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS aparelho_historico (
+        id SERIAL PRIMARY KEY,
+        aparelho_id INTEGER NOT NULL,
+        data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        usuario_id INTEGER,
+        usuario_nome TEXT,
+        acao TEXT,
+        detalhes TEXT,
+        quiosque_id INTEGER
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS seminovos_estoque (
+        id SERIAL PRIMARY KEY,
+        aparelho_id INTEGER NOT NULL,
+        codigo_interno TEXT,
+        imei TEXT,
+        modelo TEXT,
+        cor TEXT,
+        capacidade TEXT,
+        custo_compra DOUBLE PRECISION DEFAULT 0,
+        custo_reparo DOUBLE PRECISION DEFAULT 0,
+        custo_total DOUBLE PRECISION DEFAULT 0,
+        valor_venda DOUBLE PRECISION DEFAULT 0,
+        lucro_estimado DOUBLE PRECISION DEFAULT 0,
+        status TEXT DEFAULT 'Disponível',
+        vendido_em TIMESTAMP,
+        comprador TEXT,
+        termo_venda_html TEXT,
+        quiosque_id INTEGER,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    _create_device_purchase_indexes(cursor)
+
+
+def _create_device_purchase_indexes(cursor):
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_aparelho_compras_quiosque_status ON aparelho_compras(quiosque_id, status, id)",
+        "CREATE INDEX IF NOT EXISTS idx_aparelho_compras_imei ON aparelho_compras(imei)",
+        "CREATE INDEX IF NOT EXISTS idx_aparelho_compras_cliente ON aparelho_compras(cliente)",
+        "CREATE INDEX IF NOT EXISTS idx_aparelho_checklists_aparelho_etapa ON aparelho_checklists(aparelho_id, etapa)",
+        "CREATE INDEX IF NOT EXISTS idx_aparelho_anexos_aparelho ON aparelho_anexos(aparelho_id)",
+        "CREATE INDEX IF NOT EXISTS idx_aparelho_historico_aparelho ON aparelho_historico(aparelho_id, data_hora)",
+        "CREATE INDEX IF NOT EXISTS idx_seminovos_quiosque_status ON seminovos_estoque(quiosque_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_seminovos_aparelho ON seminovos_estoque(aparelho_id)",
+    ]
+    for query in indexes:
+        cursor.execute(query)
 
 
 def _seed_quiosques(cursor):

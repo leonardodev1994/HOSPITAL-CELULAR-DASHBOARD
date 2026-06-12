@@ -8,6 +8,7 @@ from views.caixa_diario import render_caixa_diario
 from views.backup import render_backup
 from views.catalogo import render_catalogo
 from views.clientes import render_clientes
+from views.compra_aparelhos import render_compra_aparelhos
 from views.dashboard_diario import render_dashboard_diario
 from views.dashboard_geral import render_dashboard_geral
 from views.dashboard_mensal import render_dashboard_mensal
@@ -28,7 +29,7 @@ from utils.style import apply_style
 
 LOGO_PATH = Path("assets/branding/tx_logo_icon.png")
 ICON_PATH = Path("assets/branding/tx_logo_icon.png")
-APP_VERSION = "audit-screen-2026-06-04"
+APP_VERSION = "seminovos-2026-06-12"
 
 st.set_page_config(
     page_title="TX System",
@@ -83,6 +84,7 @@ MENU_ITEMS = {
     "Caixa Diário": render_caixa_diario,
     "Despesas": render_despesas,
     "Ordem de Serviço": render_ordem_servico,
+    "Compra de Aparelhos": render_compra_aparelhos,
     "Usuários/Funcionários": render_usuarios,
     "Auditoria": render_auditoria,
     "Backup": render_backup,
@@ -90,7 +92,7 @@ MENU_ITEMS = {
 
 MENU_GROUPS = {
     "Análise": ["Dashboard Geral", "Dashboard Diário", "Dashboard Mensal"],
-    "Operação": ["Clientes", "Catálogo", "Estoque", "Serviços", "Novo Lançamento", "Lançamentos", "Ordem de Serviço"],
+    "Operação": ["Clientes", "Catálogo", "Estoque", "Serviços", "Novo Lançamento", "Lançamentos", "Ordem de Serviço", "Compra de Aparelhos"],
     "Financeiro": ["Caixa Diário", "Lançamentos Cancelados", "Despesas"],
     "Sistema": ["Usuários/Funcionários", "Auditoria", "Backup"],
 }
@@ -109,6 +111,7 @@ MENU_ICONS = {
     "Caixa Diário": ":material/account_balance_wallet:",
     "Despesas": ":material/trending_down:",
     "Ordem de Serviço": ":material/build:",
+    "Compra de Aparelhos": ":material/phone_iphone:",
     "Usuários/Funcionários": ":material/admin_panel_settings:",
     "Auditoria": ":material/manage_search:",
     "Backup": ":material/cloud_upload:",
