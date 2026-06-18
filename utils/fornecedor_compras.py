@@ -378,7 +378,7 @@ def csv_preview(uploaded_file, conn=None):
 
 
 def _sheet_candidate_names():
-    return ["Importacao_Simples", "CSV TX", "Compras"]
+    return ["Importacao", "Importacao_Simples", "CSV TX", "Compras"]
 
 
 def _excel_source(uploaded_file):
@@ -400,7 +400,7 @@ def _excel_to_rows(uploaded_file):
     if chosen_df is None:
         for df in workbook.values():
             normalized_columns = {_normalize_token(column).lower() for column in df.columns}
-            if "datacompra" in normalized_columns and "fornecedor" in normalized_columns and "valor" in normalized_columns:
+            if "datacompra" in normalized_columns and "valor" in normalized_columns:
                 chosen_df = df
                 break
     if chosen_df is None:
@@ -410,6 +410,8 @@ def _excel_to_rows(uploaded_file):
     for row in chosen_df.fillna("").to_dict("records"):
         mapped = {}
         for key, value in row.items():
+            if key is None or str(key).startswith("Unnamed:"):
+                continue
             normalized_key = _normalize_token(key).lower()
             if normalized_key in {"data", "datacompra"}:
                 mapped["data_compra"] = value
