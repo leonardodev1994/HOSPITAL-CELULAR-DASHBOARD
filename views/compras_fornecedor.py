@@ -90,13 +90,26 @@ def _preview_editor(conn, df):
         return None
     base_df = df.copy()
     visible_df = base_df[SIMPLE_PREVIEW_COLUMNS].copy()
+    visible_df["data_compra"] = visible_df["data_compra"].fillna("").astype(str)
+    visible_df["tipo"] = visible_df["tipo"].fillna("").astype(str)
+    visible_df["descricao_original"] = visible_df["descricao_original"].fillna("").astype(str)
+    visible_df["observacao"] = visible_df["observacao"].fillna("").astype(str)
+    visible_df["status_pagamento"] = visible_df["status_pagamento"].fillna("Em aberto").astype(str)
+    visible_df["valor"] = pd.to_numeric(visible_df["valor"], errors="coerce").fillna(0.0)
     edited = st.data_editor(
         visible_df,
         width="stretch",
         num_rows="dynamic",
         hide_index=True,
         key="supplier_purchase_preview_editor",
-        column_config={key: value for key, value in _column_config().items() if key in SIMPLE_PREVIEW_COLUMNS},
+        column_config={
+            "data_compra": st.column_config.TextColumn("Data"),
+            "tipo": st.column_config.TextColumn("Tipo"),
+            "descricao_original": st.column_config.TextColumn("Descrição original", width="large"),
+            "valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+            "observacao": st.column_config.TextColumn("Observação", width="large"),
+            "status_pagamento": st.column_config.TextColumn("Status"),
+        },
     )
     for column in SIMPLE_PREVIEW_COLUMNS:
         base_df[column] = edited[column]
