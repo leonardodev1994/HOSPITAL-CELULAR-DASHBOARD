@@ -9,6 +9,7 @@ from views.backup import render_backup
 from views.catalogo import render_catalogo
 from views.clientes import render_clientes
 from views.compra_aparelhos import render_compra_aparelhos
+from views.compras_fornecedor import render_compras_fornecedor
 from views.dashboard_diario import render_dashboard_diario
 from views.dashboard_geral import render_dashboard_geral
 from views.dashboard_mensal import render_dashboard_mensal
@@ -83,6 +84,7 @@ MENU_ITEMS = {
     "Lançamentos Cancelados": render_lancamentos_cancelados,
     "Caixa Diário": render_caixa_diario,
     "Despesas": render_despesas,
+    "Compras de Fornecedor": render_compras_fornecedor,
     "Ordem de Serviço": render_ordem_servico,
     "Compra de Aparelhos": render_compra_aparelhos,
     "Usuários/Funcionários": render_usuarios,
@@ -93,7 +95,7 @@ MENU_ITEMS = {
 MENU_GROUPS = {
     "Análise": ["Dashboard Geral", "Dashboard Diário", "Dashboard Mensal"],
     "Operação": ["Clientes", "Catálogo", "Estoque", "Serviços", "Novo Lançamento", "Lançamentos", "Ordem de Serviço", "Compra de Aparelhos"],
-    "Financeiro": ["Caixa Diário", "Lançamentos Cancelados", "Despesas"],
+    "Financeiro": ["Caixa Diário", "Lançamentos Cancelados", "Despesas", "Compras de Fornecedor"],
     "Sistema": ["Usuários/Funcionários", "Auditoria", "Backup"],
 }
 
@@ -110,6 +112,7 @@ MENU_ICONS = {
     "Lançamentos Cancelados": ":material/cancel:",
     "Caixa Diário": ":material/account_balance_wallet:",
     "Despesas": ":material/trending_down:",
+    "Compras de Fornecedor": ":material/request_quote:",
     "Ordem de Serviço": ":material/build:",
     "Compra de Aparelhos": ":material/phone_iphone:",
     "Usuários/Funcionários": ":material/admin_panel_settings:",

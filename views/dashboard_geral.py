@@ -9,9 +9,10 @@ from utils.dashboard_ui import PLOTLY_CONFIG, empty_state, moeda, page_banner, p
 from utils.permissions import has_permission, require_permission
 from utils.quiosques import scope_clause, user_can_view_all
 from utils.tx_components import tx_card
+from utils.weekly_goal import WEEKLY_GOAL_SETTINGS, render_weekly_goal_block
 
 
-META_DIARIA_PADRAO = 1000.0
+META_DIARIA_PADRAO = WEEKLY_GOAL_SETTINGS["daily_goal"]
 SANGRIA_ALERTA_PADRAO = 500.0
 
 
@@ -801,6 +802,10 @@ def render_dashboard_geral(conn):
     _render_company_status(alerts)
     st.write("")
     _render_goal_card(META_DIARIA_PADRAO, faturamento_hoje)
+
+    st.divider()
+
+    render_weekly_goal_block(conn)
 
     st.divider()
 

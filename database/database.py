@@ -136,6 +136,7 @@ MIGRATIONS = [
     ("0011_catalogo_precos", "_migration_0011_catalogo_precos"),
     ("0012_auditoria_indices", "_migration_0012_auditoria_indices"),
     ("0013_compra_aparelhos", "_migration_0013_compra_aparelhos"),
+    ("0014_compras_fornecedor", "_migration_0014_compras_fornecedor"),
 ]
 
 
@@ -159,6 +160,7 @@ SCOPED_TABLES = [
     "caixa",
     "ordens_servico",
     "clientes",
+    "compras_fornecedor",
 ]
 
 
@@ -302,6 +304,14 @@ def _migration_0013_compra_aparelhos(conn):
         return
 
     _create_sqlite_device_purchase_schema(conn)
+
+
+def _migration_0014_compras_fornecedor(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_supplier_purchase_schema(conn)
+        return
+
+    _create_sqlite_supplier_purchase_schema(conn)
 
 
 def ensure_catalog_price_schema(conn):
@@ -1555,6 +1565,130 @@ def _create_device_purchase_indexes(cursor):
     ]
     for query in indexes:
         cursor.execute(query)
+
+
+def _create_sqlite_supplier_purchase_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS compras_fornecedor (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_compra TEXT,
+        fornecedor TEXT,
+        tipo TEXT,
+        modelo TEXT,
+        aro TEXT,
+        tecnologia TEXT,
+        valor REAL NOT NULL DEFAULT 0,
+        valor_pago REAL NOT NULL DEFAULT 0,
+        data_pagamento TEXT,
+        observacao TEXT,
+        status_pagamento TEXT DEFAULT 'Em aberto',
+        despesa_id INTEGER,
+        arquivo_origem TEXT,
+        ocr_bruto TEXT,
+        quiosque_id INTEGER,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS compras_fornecedor_siglas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sigla TEXT NOT NULL UNIQUE,
+        categoria TEXT NOT NULL,
+        valor_expandido TEXT NOT NULL,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    _add_column_if_missing(cursor, "despesas", "fornecedor", "TEXT")
+    _add_column_if_missing(cursor, "despesas", "origem", "TEXT")
+    _add_column_if_missing(cursor, "despesas", "compra_fornecedor_id", "INTEGER")
+    _seed_supplier_purchase_dictionary(cursor)
+    _create_supplier_purchase_indexes(cursor)
+
+
+def _create_postgres_supplier_purchase_schema(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS compras_fornecedor (
+        id SERIAL PRIMARY KEY,
+        data_compra TEXT,
+        fornecedor TEXT,
+        tipo TEXT,
+        modelo TEXT,
+        aro TEXT,
+        tecnologia TEXT,
+        valor DOUBLE PRECISION NOT NULL DEFAULT 0,
+        valor_pago DOUBLE PRECISION NOT NULL DEFAULT 0,
+        data_pagamento TEXT,
+        observacao TEXT,
+        status_pagamento TEXT DEFAULT 'Em aberto',
+        despesa_id INTEGER,
+        arquivo_origem TEXT,
+        ocr_bruto TEXT,
+        quiosque_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS compras_fornecedor_siglas (
+        id SERIAL PRIMARY KEY,
+        sigla TEXT NOT NULL UNIQUE,
+        categoria TEXT NOT NULL,
+        valor_expandido TEXT NOT NULL,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    _add_postgres_column_if_missing(cursor, "despesas", "fornecedor", "TEXT")
+    _add_postgres_column_if_missing(cursor, "despesas", "origem", "TEXT")
+    _add_postgres_column_if_missing(cursor, "despesas", "compra_fornecedor_id", "INTEGER")
+    _seed_supplier_purchase_dictionary(cursor)
+    _create_supplier_purchase_indexes(cursor)
+
+
+def _create_supplier_purchase_indexes(cursor):
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_compras_fornecedor_quiosque_data ON compras_fornecedor(quiosque_id, data_compra)",
+        "CREATE INDEX IF NOT EXISTS idx_compras_fornecedor_fornecedor ON compras_fornecedor(fornecedor)",
+        "CREATE INDEX IF NOT EXISTS idx_compras_fornecedor_status ON compras_fornecedor(status_pagamento)",
+        "CREATE INDEX IF NOT EXISTS idx_despesas_compra_fornecedor ON despesas(compra_fornecedor_id)",
+    ]
+    for query in indexes:
+        cursor.execute(query)
+
+
+def _seed_supplier_purchase_dictionary(cursor):
+    defaults = [
+        ("FT", "tipo", "Frontal"),
+        ("BT", "tipo", "Bateria"),
+        ("D", "tipo", "Dock"),
+        ("TP", "tipo", "Tampa"),
+        ("L", "tipo", "Lente"),
+        ("S/A", "aro", "Sem Aro"),
+        ("C/A", "aro", "Com Aro"),
+        ("INC", "tecnologia", "Incell"),
+        ("OLED", "tecnologia", "OLED"),
+        ("ORI", "tecnologia", "Original"),
+        ("COMP", "tecnologia", "Compatível"),
+    ]
+    for sigla, categoria, valor_expandido in defaults:
+        cursor.execute(
+            """
+            INSERT INTO compras_fornecedor_siglas (sigla, categoria, valor_expandido, ativo)
+            VALUES (?, ?, ?, 1)
+            ON CONFLICT (sigla) DO UPDATE SET
+                categoria = excluded.categoria,
+                valor_expandido = excluded.valor_expandido,
+                ativo = 1,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (sigla, categoria, valor_expandido),
+        )
 
 
 def _seed_quiosques(cursor):

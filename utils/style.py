@@ -817,11 +817,179 @@ def apply_style():
         color: #667085 !important;
     }
 
+    .weekly-goal-card {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: var(--shadow-soft);
+        padding: 18px;
+        display: grid;
+        gap: 16px;
+    }
+
+    .weekly-goal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .weekly-goal-header span {
+        display: block;
+        font-size: .8rem;
+        font-weight: 700;
+        color: var(--muted) !important;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+
+    .weekly-goal-header strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 1.1rem;
+        color: var(--text) !important;
+    }
+
+    .weekly-goal-header em {
+        font-style: normal;
+        font-size: .88rem;
+        color: var(--muted) !important;
+        background: #F8FAFC;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 8px 12px;
+        white-space: nowrap;
+    }
+
+    .weekly-goal-progress-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+        font-size: .92rem;
+    }
+
+    .weekly-goal-progress-head strong {
+        color: var(--text) !important;
+    }
+
+    .weekly-goal-track {
+        width: 100%;
+        height: 10px;
+        border-radius: 999px;
+        background: #E5E7EB;
+        overflow: hidden;
+    }
+
+    .weekly-goal-track i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #16A34A 0%, #22C55E 100%);
+    }
+
+    .weekly-goal-progress p {
+        margin: 8px 0 0;
+        color: var(--muted) !important;
+        font-size: .88rem;
+    }
+
+    .weekly-goal-days {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .weekly-goal-day-card {
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #FFFFFF;
+        padding: 14px;
+        box-shadow: 0 10px 26px rgba(16, 24, 40, .05);
+        display: grid;
+        gap: 8px;
+    }
+
+    .weekly-goal-day-card.is-hit {
+        border-color: rgba(22, 163, 74, .22);
+        background: linear-gradient(180deg, rgba(22, 163, 74, .08) 0%, #FFFFFF 100%);
+    }
+
+    .weekly-goal-day-card.is-miss {
+        border-color: rgba(230, 57, 70, .22);
+        background: linear-gradient(180deg, rgba(230, 57, 70, .07) 0%, #FFFFFF 100%);
+    }
+
+    .weekly-goal-day-card.is-open {
+        border-color: rgba(148, 163, 184, .3);
+        background: linear-gradient(180deg, rgba(148, 163, 184, .10) 0%, #FFFFFF 100%);
+    }
+
+    .weekly-goal-day-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .weekly-goal-day-top strong {
+        color: var(--text) !important;
+        font-size: .96rem;
+    }
+
+    .weekly-goal-day-top span {
+        color: var(--muted) !important;
+        font-size: .78rem;
+        text-align: right;
+        line-height: 1.3;
+    }
+
+    .weekly-goal-day-value {
+        font-size: 1.18rem;
+        font-weight: 800;
+        color: var(--text) !important;
+    }
+
+    .weekly-goal-day-card small {
+        color: var(--muted) !important;
+        font-size: .78rem;
+    }
+
+    .weekly-goal-summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .weekly-goal-summary-item {
+        background: #FFFFFF;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px 14px;
+    }
+
+    .weekly-goal-summary-item span {
+        display: block;
+        font-size: .78rem;
+        color: var(--muted) !important;
+        margin-bottom: 4px;
+    }
+
+    .weekly-goal-summary-item strong {
+        color: var(--text) !important;
+        font-size: 1rem;
+    }
+
     hr {
         border-color: var(--border);
     }
 
     @media (max-width: 900px) {
+        .weekly-goal-days,
+        .weekly-goal-summary {
+            grid-template-columns: 1fr 1fr;
+        }
+
         .main .block-container {
             padding-left: 1rem;
             padding-right: 1rem;
@@ -899,6 +1067,28 @@ def apply_style():
     }
 
     @media (max-width: 768px) {
+        .weekly-goal-card {
+            padding: 16px;
+        }
+
+        .weekly-goal-header,
+        .weekly-goal-day-top,
+        .weekly-goal-progress-head {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .weekly-goal-header em,
+        .weekly-goal-day-top span {
+            white-space: normal;
+            text-align: left;
+        }
+
+        .weekly-goal-days,
+        .weekly-goal-summary {
+            grid-template-columns: 1fr;
+        }
+
         :root {
             --bg: #F8FAFC;
             --shadow: 0 10px 26px rgba(16, 24, 40, .06);

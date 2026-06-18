@@ -15,6 +15,7 @@ from utils.dashboard_ui import (
 from utils.permissions import has_permission
 from utils.quiosques import scope_clause, scoped_params, user_can_view_all
 from utils.tx_components import tx_card
+from utils.weekly_goal import WEEKLY_GOAL_SETTINGS, render_weekly_goal_block
 
 
 FORMAS_PAGAMENTO = ["Dinheiro", "Pix", "Crédito", "Débito"]
@@ -771,7 +772,7 @@ def render_dashboard_diario(conn):
     diferenca = total - total_anterior
     diferenca_label = f"{_moeda(diferenca)} vs. dia anterior"
 
-    meta = 1000
+    meta = WEEKLY_GOAL_SETTINGS["daily_goal"]
 
     _render_manager_attention(conn, data_filtro, total, meta)
 
@@ -807,6 +808,10 @@ def render_dashboard_diario(conn):
     st.divider()
 
     _render_meta_diaria(total, meta)
+
+    st.divider()
+
+    render_weekly_goal_block(conn)
 
     st.divider()
 
