@@ -125,6 +125,7 @@ def _process_inputs(conn):
         key="supplier_purchase_csv",
         help="Aceita o modelo simplificado por dia ou a planilha detalhada/CSV TX.",
     )
+    st.session_state.setdefault("supplier_purchase_last_file", "")
 
     cols = st.columns(3)
     with cols[0]:
@@ -132,7 +133,7 @@ def _process_inputs(conn):
     with cols[1]:
         parse_text = st.button("Converter texto em tabela", width="stretch", disabled=not raw_text.strip())
     with cols[2]:
-        parse_csv = st.button("Pré-visualizar CSV", width="stretch", disabled=csv_file is None)
+        parse_csv = st.button("Atualizar prévia", width="stretch", disabled=csv_file is None)
 
     if use_ai:
         if not ai_ocr_available():
@@ -156,13 +157,21 @@ def _process_inputs(conn):
         st.session_state["supplier_purchase_extracted_meta"] = []
         st.success(f"{len(preview_df)} item(ns) convertido(s) do texto.")
 
-    if parse_csv:
+    should_preview_file = False
+    current_file_name = str(csv_file.name or "") if csv_file is not None else ""
+    if csv_file is not None and current_file_name and st.session_state.get("supplier_purchase_last_file") != current_file_name:
+        should_preview_file = True
+    if parse_csv and csv_file is not None:
+        should_preview_file = True
+
+    if should_preview_file:
         if str(csv_file.name or "").lower().endswith((".xlsx", ".xlsm")):
             preview_df = spreadsheet_preview(csv_file, conn=conn)
         else:
             preview_df = csv_preview(csv_file, conn=conn)
         st.session_state["supplier_purchase_preview_df"] = preview_df
         st.session_state["supplier_purchase_extracted_meta"] = []
+        st.session_state["supplier_purchase_last_file"] = current_file_name
         st.success(f"{len(preview_df)} item(ns) carregado(s) do arquivo.")
 
 
