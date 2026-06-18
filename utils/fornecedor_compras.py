@@ -13,6 +13,7 @@ from urllib import error, request
 import pandas as pd
 import streamlit as st
 
+from database.database import ensure_supplier_purchase_schema
 from utils.audit import log_action
 from utils.auth import current_user
 from utils.quiosques import current_quiosque_id, scope_clause
@@ -144,6 +145,7 @@ def _extract_json_payload(text):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_supplier_dictionary(_conn):
+    ensure_supplier_purchase_schema(_conn)
     return pd.read_sql_query(
         """
         SELECT id, sigla, categoria, valor_expandido, ativo
@@ -168,6 +170,7 @@ def dictionary_map(conn):
 
 
 def update_supplier_dictionary(conn, rows, user):
+    ensure_supplier_purchase_schema(conn)
     cursor = conn.cursor()
     saved = 0
     for row in rows:
@@ -430,6 +433,8 @@ def _openai_extract_file(uploaded_file, conn=None):
 
 
 def preview_from_images(files, conn=None):
+    if conn is not None:
+        ensure_supplier_purchase_schema(conn)
     aggregated_rows = []
     extracted = []
     fallback_text = []
@@ -468,6 +473,7 @@ def save_uploaded_sheet(uploaded_file):
 
 
 def import_supplier_purchases(conn, preview_df, extracted_meta=None, user=None, create_expenses=True):
+    ensure_supplier_purchase_schema(conn)
     if preview_df is None or preview_df.empty:
         return {"compras": 0, "despesas": 0, "total": 0.0}
 
@@ -598,6 +604,7 @@ def import_supplier_purchases(conn, preview_df, extracted_meta=None, user=None, 
 
 
 def load_supplier_purchases(conn, fornecedor="", status_pagamento="", limit=400):
+    ensure_supplier_purchase_schema(conn)
     where_scope, params_scope = scope_clause("c")
     filters = []
     params = []
@@ -642,6 +649,7 @@ def load_supplier_purchases(conn, fornecedor="", status_pagamento="", limit=400)
 
 
 def load_supplier_summary(conn):
+    ensure_supplier_purchase_schema(conn)
     where_scope, params_scope = scope_clause("c")
     return pd.read_sql_query(
         f"""
@@ -659,6 +667,7 @@ def load_supplier_summary(conn):
 
 
 def load_supplier_history(conn):
+    ensure_supplier_purchase_schema(conn)
     where_scope, params_scope = scope_clause("c")
     return pd.read_sql_query(
         f"""
@@ -680,6 +689,7 @@ def load_supplier_history(conn):
 
 
 def update_purchase_payment(conn, compra_id, status_pagamento, valor_pago, data_pagamento, observacao, user=None):
+    ensure_supplier_purchase_schema(conn)
     user = user or current_user()
     cursor = conn.cursor()
     row = cursor.execute(

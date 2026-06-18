@@ -330,6 +330,14 @@ def ensure_quiosques_schema(conn):
     conn.commit()
 
 
+def ensure_supplier_purchase_schema(conn):
+    if getattr(conn, "backend", "sqlite") == "postgres":
+        _create_postgres_supplier_purchase_schema(conn)
+    else:
+        _create_sqlite_supplier_purchase_schema(conn)
+    conn.commit()
+
+
 def _create_sqlite_schema(conn):
     cursor = conn.cursor()
 

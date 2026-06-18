@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+from database.database import ensure_supplier_purchase_schema
 from utils.auth import current_user
 from utils.dashboard_ui import light_page_header, moeda
 from utils.fornecedor_compras import (
@@ -317,6 +318,7 @@ def render_compras_fornecedor(conn):
     if not require_permission("manage_supplier_purchases"):
         return
 
+    ensure_supplier_purchase_schema(conn)
     user = current_user()
     st.session_state.setdefault("supplier_purchase_preview_df", pd.DataFrame(columns=SUPPLIER_PURCHASE_COLUMNS))
     st.session_state.setdefault("supplier_purchase_extracted_meta", [])
