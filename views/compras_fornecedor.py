@@ -30,6 +30,16 @@ from utils.fornecedor_compras import (
 from utils.permissions import require_permission
 
 
+SIMPLE_PREVIEW_COLUMNS = [
+    "data_compra",
+    "tipo",
+    "descricao_original",
+    "valor",
+    "observacao",
+    "status_pagamento",
+]
+
+
 def _column_config():
     return {
         "data_compra": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
@@ -78,19 +88,24 @@ def _preview_editor(conn, df):
     if df is None or df.empty:
         st.info("Nenhum item pronto para conferência ainda.")
         return None
+    base_df = df.copy()
+    visible_df = base_df[SIMPLE_PREVIEW_COLUMNS].copy()
     edited = st.data_editor(
-        df,
+        visible_df,
         width="stretch",
         num_rows="dynamic",
         hide_index=True,
         key="supplier_purchase_preview_editor",
-        column_config=_column_config(),
+        column_config={key: value for key, value in _column_config().items() if key in SIMPLE_PREVIEW_COLUMNS},
     )
-    return edited[SUPPLIER_PURCHASE_COLUMNS]
+    for column in SIMPLE_PREVIEW_COLUMNS:
+        base_df[column] = edited[column]
+    return base_df[SUPPLIER_PURCHASE_COLUMNS]
 
 
 def _process_inputs(conn):
-    st.subheader("OCR / Importação")
+    st.subheader("Importar planilha de despesas")
+    st.caption("Envie a planilha, confira as linhas e importe. Cada linha vira uma despesa com o valor correspondente.")
     files = st.file_uploader(
         "Foto da folha do fornecedor",
         type=["png", "jpg", "jpeg", "webp"],
@@ -157,23 +172,25 @@ def _import_actions(conn, user):
     if edited_df is None:
         return
 
+    total_preview = float(edited_df["valor"].sum()) if not edited_df.empty else 0.0
+    st.info(f"Prévia pronta: {len(edited_df)} linha(s) • total {moeda(total_preview)}.")
+
     col_import, col_clear = st.columns(2)
     with col_import:
-        create_expenses = st.checkbox("Lançar também em Despesas", value=True, key="supplier_purchase_create_expense")
-        if st.button("Importar compras confirmadas", width="stretch", key="import_supplier_purchases"):
+        if st.button("Importar e lançar em Despesas", width="stretch", key="import_supplier_purchases"):
             try:
                 result = import_supplier_purchases(
                     conn,
                     edited_df,
                     extracted_meta=st.session_state.get("supplier_purchase_extracted_meta") or [],
                     user=user,
-                    create_expenses=create_expenses,
+                    create_expenses=True,
                 )
             except Exception as error:
                 st.error(str(error))
             else:
                 st.success(
-                    f"{result['compras']} compra(s) importada(s), {result['despesas']} despesa(s) criada(s), total {moeda(result['total'])}."
+                    f"{result['despesas']} despesa(s) criada(s) com sucesso. Total importado: {moeda(result['total'])}."
                 )
                 st.session_state["supplier_purchase_preview_df"] = pd.DataFrame(columns=SUPPLIER_PURCHASE_COLUMNS)
                 st.session_state["supplier_purchase_extracted_meta"] = []
@@ -183,6 +200,28 @@ def _import_actions(conn, user):
             st.session_state["supplier_purchase_preview_df"] = pd.DataFrame(columns=SUPPLIER_PURCHASE_COLUMNS)
             st.session_state["supplier_purchase_extracted_meta"] = []
             st.rerun()
+
+
+def _recent_imported_expenses(conn):
+    df = pd.read_sql_query(
+        """
+        SELECT data, descricao, valor
+        FROM despesas
+        WHERE COALESCE(origem, '') = 'compras_fornecedor'
+        ORDER BY id DESC
+        LIMIT 20
+        """,
+        conn,
+    )
+    if df.empty:
+        st.info("Nenhuma despesa importada por este módulo ainda.")
+        return
+    st.dataframe(
+        df.rename(columns={"data": "Data", "descricao": "Descrição", "valor": "Valor"}),
+        hide_index=True,
+        width="stretch",
+        column_config={"Valor": st.column_config.NumberColumn("Valor", format="R$ %.2f")},
+    )
 
 
 def _summary_and_history(conn):
@@ -332,20 +371,25 @@ def render_compras_fornecedor(conn):
     light_page_header(
         "🧾",
         "Compras de Fornecedor",
-        "Importe folhas manuscritas, estruture peças, gere despesas e acompanhe o contas a pagar.",
+        "Importe a planilha e registre cada linha como despesa de peça.",
     )
 
     if ai_ocr_available():
-        st.caption("OCR com IA habilitado para imagens. Sem depender de planilha manual.")
+        st.caption("OCR com IA habilitado. A meta e sair no mesmo formato simples da planilha.")
     else:
-        st.caption("OCR com IA desabilitado no ambiente atual. Você ainda pode importar CSV ou colar texto OCR/manual.")
+        st.caption("OCR com IA desabilitado no ambiente atual. Você ainda pode importar planilha, CSV ou colar texto manual.")
 
-    _summary_and_history(conn)
-    st.divider()
     _process_inputs(conn)
     st.divider()
     _import_actions(conn, user)
     st.divider()
-    _purchase_manager(conn, user)
-    st.divider()
-    _dictionary_editor(conn, user)
+    st.subheader("Últimas despesas importadas")
+    _recent_imported_expenses(conn)
+
+    with st.expander("Controle financeiro e histórico", expanded=False):
+        _summary_and_history(conn)
+        st.divider()
+        _purchase_manager(conn, user)
+
+    with st.expander("Dicionário de siglas", expanded=False):
+        _dictionary_editor(conn, user)
