@@ -22,6 +22,7 @@ from utils.fornecedor_compras import (
     load_supplier_summary,
     preview_from_images,
     preview_from_text,
+    spreadsheet_preview,
     ai_ocr_available,
     update_purchase_payment,
     update_supplier_dictionary,
@@ -102,8 +103,8 @@ def _process_inputs(conn):
         key="supplier_purchase_raw_text",
     )
     csv_file = st.file_uploader(
-        "Ou importar CSV",
-        type=["csv"],
+        "Ou importar planilha/CSV",
+        type=["csv", "xlsx", "xlsm"],
         accept_multiple_files=False,
         key="supplier_purchase_csv",
     )
@@ -139,10 +140,13 @@ def _process_inputs(conn):
         st.success(f"{len(preview_df)} item(ns) convertido(s) do texto.")
 
     if parse_csv:
-        preview_df = csv_preview(csv_file, conn=conn)
+        if str(csv_file.name or "").lower().endswith((".xlsx", ".xlsm")):
+            preview_df = spreadsheet_preview(csv_file, conn=conn)
+        else:
+            preview_df = csv_preview(csv_file, conn=conn)
         st.session_state["supplier_purchase_preview_df"] = preview_df
         st.session_state["supplier_purchase_extracted_meta"] = []
-        st.success(f"{len(preview_df)} item(ns) carregado(s) do CSV.")
+        st.success(f"{len(preview_df)} item(ns) carregado(s) do arquivo.")
 
 
 def _import_actions(conn, user):

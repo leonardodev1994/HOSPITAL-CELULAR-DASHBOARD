@@ -67,6 +67,17 @@ def _clean_text(value):
     return str(value or "").strip()
 
 
+def _normalize_payment_status(value):
+    normalized = _normalize_token(value).lower()
+    if normalized in {"pago", "quitado"}:
+        return "Pago"
+    if normalized in {"parcial", "parcialmentepago"}:
+        return "Parcial"
+    if normalized in {"pendente", "emaberto", "aberto", "naopago"}:
+        return "Em aberto"
+    return _clean_text(value) or "Em aberto"
+
+
 def _money_to_float(value):
     if pd.isna(value) or value == "":
         return 0.0
@@ -115,7 +126,8 @@ def _normalize_date(value):
     if not text:
         return datetime.today().date().isoformat()
 
-    parsed = pd.to_datetime(text, errors="coerce", dayfirst=True)
+    iso_like = bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", text))
+    parsed = pd.to_datetime(text, errors="coerce", dayfirst=not iso_like)
     if pd.isna(parsed):
         return datetime.today().date().isoformat()
     return parsed.date().isoformat()
@@ -207,7 +219,13 @@ def _normalize_purchase_row(row, default_supplier="", default_date="", mapping=N
     aro = _clean_text(row.get("aro"))
     tecnologia = _clean_text(row.get("tecnologia"))
     modelo = _clean_text(row.get("modelo"))
-    observacao = _clean_text(row.get("observacao") or observation_prefix)
+    extra_notes = []
+    if row.get("descricao_original"):
+        extra_notes.append(f"Original: {_clean_text(row.get('descricao_original'))}")
+    if row.get("conferencia"):
+        extra_notes.append(f"Conferência: {_clean_text(row.get('conferencia'))}")
+    base_observation = _clean_text(row.get("observacao") or observation_prefix)
+    observacao = " | ".join(part for part in [base_observation] + extra_notes if part)
 
     for field_name, current_value in [("tipo", tipo), ("aro", aro), ("tecnologia", tecnologia)]:
         token = _normalize_token(current_value)
@@ -229,7 +247,7 @@ def _normalize_purchase_row(row, default_supplier="", default_date="", mapping=N
         "tecnologia": tecnologia or "Não informado",
         "valor": round(_money_to_float(row.get("valor")), 2),
         "observacao": observacao,
-        "status_pagamento": _clean_text(row.get("status_pagamento") or "Em aberto"),
+        "status_pagamento": _normalize_payment_status(row.get("status_pagamento") or "Em aberto"),
         "valor_pago": round(_money_to_float(row.get("valor_pago")), 2),
         "data_pagamento": _clean_text(row.get("data_pagamento")),
     }
@@ -346,6 +364,75 @@ def csv_preview(uploaded_file, conn=None):
             elif normalized_key == "datapagamento":
                 mapped["data_pagamento"] = value
         rows.append(mapped)
+    return dataframe_from_rows(rows, conn=conn)
+
+
+def _sheet_candidate_names():
+    return ["CSV TX", "Compras"]
+
+
+def _excel_source(uploaded_file):
+    if hasattr(uploaded_file, "getvalue"):
+        return BytesIO(uploaded_file.getvalue())
+    return uploaded_file
+
+
+def _excel_to_rows(uploaded_file):
+    workbook = pd.read_excel(_excel_source(uploaded_file), sheet_name=None, engine="openpyxl")
+    if not workbook:
+        return []
+
+    chosen_df = None
+    for sheet_name in _sheet_candidate_names():
+        if sheet_name in workbook:
+            chosen_df = workbook[sheet_name]
+            break
+    if chosen_df is None:
+        for df in workbook.values():
+            normalized_columns = {_normalize_token(column).lower() for column in df.columns}
+            if "datacompra" in normalized_columns and "fornecedor" in normalized_columns and "valor" in normalized_columns:
+                chosen_df = df
+                break
+    if chosen_df is None:
+        return []
+
+    rows = []
+    for row in chosen_df.fillna("").to_dict("records"):
+        mapped = {}
+        for key, value in row.items():
+            normalized_key = _normalize_token(key).lower()
+            if normalized_key in {"data", "datacompra"}:
+                mapped["data_compra"] = value
+            elif normalized_key == "fornecedor":
+                mapped["fornecedor"] = value
+            elif normalized_key == "tipo":
+                mapped["tipo"] = value
+            elif normalized_key == "modelo":
+                mapped["modelo"] = value
+            elif normalized_key == "aro":
+                mapped["aro"] = value
+            elif normalized_key == "tecnologia":
+                mapped["tecnologia"] = value
+            elif normalized_key == "valor":
+                mapped["valor"] = value
+            elif normalized_key in {"observacao", "observacaoes"}:
+                mapped["observacao"] = value
+            elif normalized_key in {"statuspagamento", "status"}:
+                mapped["status_pagamento"] = value
+            elif normalized_key == "valorpago":
+                mapped["valor_pago"] = value
+            elif normalized_key == "datapagamento":
+                mapped["data_pagamento"] = value
+            elif normalized_key == "descricaooriginal":
+                mapped["descricao_original"] = value
+            elif normalized_key == "conferencia":
+                mapped["conferencia"] = value
+        rows.append(mapped)
+    return rows
+
+
+def spreadsheet_preview(uploaded_file, conn=None):
+    rows = _excel_to_rows(uploaded_file)
     return dataframe_from_rows(rows, conn=conn)
 
 
