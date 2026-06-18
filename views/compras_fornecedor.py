@@ -35,6 +35,7 @@ def _column_config():
         "data_compra": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
         "fornecedor": st.column_config.TextColumn("Fornecedor", width="medium"),
         "tipo": st.column_config.SelectboxColumn("Tipo", options=DEFAULT_TYPE_OPTIONS),
+        "descricao_original": st.column_config.TextColumn("Descrição original", width="large"),
         "modelo": st.column_config.TextColumn("Modelo", width="large"),
         "aro": st.column_config.SelectboxColumn("Aro", options=DEFAULT_ARO_OPTIONS),
         "tecnologia": st.column_config.SelectboxColumn("Tecnologia", options=DEFAULT_TECH_OPTIONS),
@@ -98,7 +99,7 @@ def _process_inputs(conn):
     )
     raw_text = st.text_area(
         "Texto OCR/manual (opcional)",
-        placeholder="Cole aqui o texto bruto ou linhas como: FT A15 S/A INC 120",
+        placeholder="Cole aqui o texto bruto ou resumos como: Compra de peças - 02/06 - 8 itens - 555",
         height=140,
         key="supplier_purchase_raw_text",
     )
@@ -107,6 +108,7 @@ def _process_inputs(conn):
         type=["csv", "xlsx", "xlsm"],
         accept_multiple_files=False,
         key="supplier_purchase_csv",
+        help="Aceita o modelo simplificado por dia ou a planilha detalhada/CSV TX.",
     )
 
     cols = st.columns(3)

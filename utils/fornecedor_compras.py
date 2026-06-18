@@ -23,6 +23,7 @@ SUPPLIER_PURCHASE_COLUMNS = [
     "data_compra",
     "fornecedor",
     "tipo",
+    "descricao_original",
     "modelo",
     "aro",
     "tecnologia",
@@ -37,6 +38,7 @@ SUPPLIER_PURCHASE_LABELS = {
     "data_compra": "Data",
     "fornecedor": "Fornecedor",
     "tipo": "Tipo",
+    "descricao_original": "Descrição original",
     "modelo": "Modelo",
     "aro": "Aro",
     "tecnologia": "Tecnologia",
@@ -48,7 +50,7 @@ SUPPLIER_PURCHASE_LABELS = {
 }
 
 PAYMENT_STATUSES = ["Em aberto", "Parcial", "Pago"]
-DEFAULT_TYPE_OPTIONS = ["Frontal", "Bateria", "Dock", "Tampa", "Lente", "Flex", "Carcaça", "Câmera", "Conector", "Outro"]
+DEFAULT_TYPE_OPTIONS = ["Compra de Peças", "Frontal", "Bateria", "Dock", "Tampa", "Lente", "Flex", "Carcaça", "Câmera", "Conector", "Outro"]
 DEFAULT_ARO_OPTIONS = ["Sem Aro", "Com Aro", "Não informado"]
 DEFAULT_TECH_OPTIONS = ["Incell", "OLED", "Original", "Compatível", "Não informado"]
 
@@ -219,9 +221,10 @@ def _normalize_purchase_row(row, default_supplier="", default_date="", mapping=N
     aro = _clean_text(row.get("aro"))
     tecnologia = _clean_text(row.get("tecnologia"))
     modelo = _clean_text(row.get("modelo"))
+    descricao_original = _clean_text(row.get("descricao_original"))
     extra_notes = []
-    if row.get("descricao_original"):
-        extra_notes.append(f"Original: {_clean_text(row.get('descricao_original'))}")
+    if descricao_original and descricao_original != modelo:
+        extra_notes.append(f"Original: {descricao_original}")
     if row.get("conferencia"):
         extra_notes.append(f"Conferência: {_clean_text(row.get('conferencia'))}")
     base_observation = _clean_text(row.get("observacao") or observation_prefix)
@@ -241,7 +244,8 @@ def _normalize_purchase_row(row, default_supplier="", default_date="", mapping=N
     return {
         "data_compra": purchase_date,
         "fornecedor": supplier,
-        "tipo": tipo or "Outro",
+        "tipo": tipo or "Compra de Peças",
+        "descricao_original": descricao_original,
         "modelo": modelo,
         "aro": aro or "Não informado",
         "tecnologia": tecnologia or "Não informado",
@@ -257,6 +261,9 @@ def dataframe_from_rows(rows, conn=None, default_supplier="", default_date="", o
     mapping = dictionary_map(conn) if conn is not None else {}
     normalized = []
     for row in rows or []:
+        descricao_marker = _normalize_token(row.get("descricao_original")).lower()
+        if descricao_marker in {"total", "totalgeral"}:
+            continue
         normalized_row = _normalize_purchase_row(
             row,
             default_supplier=default_supplier,
@@ -264,7 +271,7 @@ def dataframe_from_rows(rows, conn=None, default_supplier="", default_date="", o
             mapping=mapping,
             observation_prefix=observation_prefix,
         )
-        if not normalized_row["modelo"] and normalized_row["valor"] <= 0:
+        if not normalized_row["modelo"] and not normalized_row["descricao_original"] and normalized_row["valor"] <= 0:
             continue
         normalized.append(normalized_row)
     if not normalized:
@@ -319,7 +326,8 @@ def _line_parser(text, conn=None):
             {
                 "data_compra": purchase_date,
                 "fornecedor": supplier,
-                "tipo": tipo or "Outro",
+                "tipo": tipo or "Compra de Peças",
+                "descricao_original": line,
                 "modelo": " ".join(model_tokens).strip(),
                 "aro": aro or "Não informado",
                 "tecnologia": tecnologia or "Não informado",
@@ -347,6 +355,8 @@ def csv_preview(uploaded_file, conn=None):
                 mapped["fornecedor"] = value
             elif normalized_key == "tipo":
                 mapped["tipo"] = value
+            elif normalized_key == "descricaooriginal":
+                mapped["descricao_original"] = value
             elif normalized_key == "modelo":
                 mapped["modelo"] = value
             elif normalized_key == "aro":
@@ -368,7 +378,7 @@ def csv_preview(uploaded_file, conn=None):
 
 
 def _sheet_candidate_names():
-    return ["CSV TX", "Compras"]
+    return ["Importacao_Simples", "CSV TX", "Compras"]
 
 
 def _excel_source(uploaded_file):
@@ -407,6 +417,8 @@ def _excel_to_rows(uploaded_file):
                 mapped["fornecedor"] = value
             elif normalized_key == "tipo":
                 mapped["tipo"] = value
+            elif normalized_key == "descricaooriginal":
+                mapped["descricao_original"] = value
             elif normalized_key == "modelo":
                 mapped["modelo"] = value
             elif normalized_key == "aro":
@@ -470,10 +482,12 @@ def _openai_extract_file(uploaded_file, conn=None):
     prompt = (
         "Você está lendo uma folha manuscrita de fornecedor de peças. "
         "Extraia os itens e devolva somente JSON válido, sem markdown. "
-        "Use este formato: "
-        "{\"data_compra\":\"YYYY-MM-DD\",\"fornecedor\":\"texto\",\"observacao_geral\":\"texto\",\"itens\":["
-        "{\"tipo\":\"\",\"modelo\":\"\",\"aro\":\"\",\"tecnologia\":\"\",\"valor\":0,\"observacao\":\"\"}"
+        "Use preferencialmente este formato simplificado: "
+        "{\"data_compra\":\"YYYY-MM-DD\",\"fornecedor\":\"texto opcional\",\"observacao_geral\":\"texto\",\"itens\":["
+        "{\"tipo\":\"Compra de Peças\",\"descricao_original\":\"resumo legível do item ou do dia\",\"modelo\":\"\",\"aro\":\"\",\"tecnologia\":\"\",\"valor\":0,\"observacao\":\"\",\"status_pagamento\":\"Em aberto\"}"
         "]}. "
+        "Se a folha estiver resumida por dia, gere um item por dia com `tipo` = `Compra de Peças` e preencha `descricao_original` com um resumo como 'Compra de peças - 02/06 - 8 itens'. "
+        "Se a folha estiver item a item, ainda preencha `descricao_original` com a linha original reconhecida. "
         "Normalizações esperadas: expanda siglas quando possível. "
         "Dicionário atual:\n"
         f"{dictionary_text or '- sem dicionário configurado'}\n"
@@ -632,10 +646,14 @@ def import_supplier_purchases(conn, preview_df, extracted_meta=None, user=None, 
 
         despesa_id = None
         if create_expenses:
-            descricao = "Compra fornecedor"
-            details = " | ".join(part for part in [normalized["fornecedor"], normalized["tipo"], normalized["modelo"], normalized["tecnologia"]] if part)
-            if details:
-                descricao = f"{descricao} - {details}"
+            descricao = normalized["descricao_original"] or normalized["tipo"] or "Compra fornecedor"
+            suffix = " | ".join(
+                part
+                for part in [normalized["fornecedor"], normalized["modelo"], normalized["tecnologia"]]
+                if part
+            )
+            if suffix:
+                descricao = f"{descricao} - {suffix}"
             despesa_params = (
                 normalized["data_compra"],
                 descricao,
